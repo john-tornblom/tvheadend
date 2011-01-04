@@ -32,6 +32,7 @@
 #define DVB_DESC_REGISTRATION 0x05
 #define DVB_DESC_CA           0x09
 #define DVB_DESC_LANGUAGE     0x0a
+#define DVB_DESC_PRIVATE      0x0f
 
 /* Descriptors defined in EN 300 468 */
 

@@ -114,6 +114,10 @@ ts_recv_packet0(service_t *t, elementary_stream_t *st, const uint8_t *tsb)
     teletext_input(t, st, tsb);
     break;
 
+  case SCT_OTV:
+//    otv_input(t, st, tsb + off, 188 - off, pusi, error);
+    break;
+
   default:
     if(off > 188)
       break;
