@@ -43,7 +43,7 @@ src_install () {
 
 pkg_postinst () {
 	enewgroup tvheadend
-	enewuser tvheadend -1 -1 /var/tvheadend tvheadend
+	enewuser tvheadend -1 -1 /var/lib/tvheadend tvheadend
 
 	mkdir -p "/var/lib/tvheadend/.hts/tvheadend"   
 	if [ ! -e /var/lib/tvheadend/.hts/tvheadend/superuser ]; then
