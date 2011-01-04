@@ -45,12 +45,15 @@ pkg_postinst () {
 	enewgroup tvheadend
 	enewuser tvheadend -1 -1 /var/lib/tvheadend tvheadend
 
-	mkdir -p "/var/lib/tvheadend/.hts/tvheadend"   
 	if [ ! -e /var/lib/tvheadend/.hts/tvheadend/superuser ]; then
+		mkdir -p "/var/lib/tvheadend/.hts/tvheadend"
 		echo "{ \"username\": \"admin\", \"password\": \"admin\" }" > /var/lib/tvheadend/.hts/tvheadend/superuser
+
+		chmod -R 700 /var/lib/tvheadend/.hts
+		chmod 600 /var/lib/tvheadend/.hts/tvheadend/superuser
+		chown -R tvheadend:tvheadend /var/lib/tvheadend/.hts
 	fi
-	chown -R tvheadend:tvheadend /var/lib/tvheadend/.hts
-	chmod -R 600 /var/lib/tvheadend/.hts
+
 	einfo
 	einfo "Start tvheadend by calling on /etc/init.d/tvheadend start"
 	einfo "The webif will the be accessable on http port 9981"
