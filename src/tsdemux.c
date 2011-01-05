@@ -36,6 +36,7 @@
 #include "teletext.h"
 #include "subscriptions.h"
 #include "psi.h"
+#include "otv.h"
 #include "tsdemux.h"
 #include "parsers.h"
 #include "streaming.h"
@@ -115,7 +116,7 @@ ts_recv_packet0(service_t *t, elementary_stream_t *st, const uint8_t *tsb)
     break;
 
   case SCT_OTV:
-//    otv_input(t, st, tsb + off, 188 - off, pusi, error);
+    otv_input(t, st, tsb + off, 188 - off, pusi, error);
     break;
 
   default:

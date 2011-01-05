@@ -47,6 +47,7 @@
 #include "subscriptions.h"
 #include "serviceprobe.h"
 #include "cwc.h"
+#include "otv.h"
 #include "capmt.h"
 #include "dvr/dvr.h"
 #include "htsp.h"
@@ -391,6 +392,8 @@ main(int argc, char **argv)
   epg_init();
 
   dvr_init();
+
+  otv_init();
 
   htsp_init();
 
