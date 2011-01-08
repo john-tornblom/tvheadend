@@ -436,6 +436,8 @@ main(int argc, char **argv)
 
   mainloop();
 
+  epg_save();
+
   tvhlog(LOG_NOTICE, "STOP", "Exiting HTS Tvheadend");
 
   if(forkaway)
