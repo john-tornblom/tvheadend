@@ -45,11 +45,12 @@ pkg_postinst () {
 	enewgroup tvheadend
 	enewuser tvheadend -1 -1 /var/lib/tvheadend tvheadend
 
-	if [ ! -e /var/lib/tvheadend/.hts/tvheadend/superuser ]; then
+	if [ ! -e /var/lib/tvheadend/.hts ]; then
 		mkdir -p "/var/lib/tvheadend/.hts/tvheadend"
 		echo "{ \"username\": \"admin\", \"password\": \"admin\" }" > /var/lib/tvheadend/.hts/tvheadend/superuser
 
-		chmod -R 700 /var/lib/tvheadend/.hts
+		chmod 700 /var/lib/tvheadend/.hts
+		chmod 700 /var/lib/tvheadend/.hts/tvheadend
 		chmod 600 /var/lib/tvheadend/.hts/tvheadend/superuser
 		chown -R tvheadend:tvheadend /var/lib/tvheadend/.hts
 	fi
