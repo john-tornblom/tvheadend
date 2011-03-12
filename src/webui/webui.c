@@ -248,7 +248,7 @@ http_stream_playlist(http_connection_t *hc, channel_t *channel)
 
   channel_t *ch = NULL;
   const char *host = http_arg_get(&hc->hc_args, "Host");
-
+  
   pthread_mutex_lock(&global_lock);
 
   htsbuf_qprintf(hq, "#EXTM3U\n");
@@ -257,7 +257,7 @@ http_stream_playlist(http_connection_t *hc, channel_t *channel)
       htsbuf_qprintf(hq, "#EXTINF:-1,%s\n", ch->ch_name);
 
       snprintf(buf, sizeof(buf), "/stream/channelid/%d", ch->ch_id);
-      ticket_id = access_ticket_create(buf);
+      ticket_id = access_ticket_create(buf, 5);
       htsbuf_qprintf(hq, "http://%s%s?ticket=%s\n", host, buf, ticket_id);
     }
   }
@@ -304,7 +304,7 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
       htsbuf_qprintf(hq, "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%d\n", bandwidth);
 
       snprintf(buf, sizeof(buf), "/dvrfile/%d", dvr_id);
-      ticket_id = access_ticket_create(buf);
+      ticket_id = access_ticket_create(buf, durration);
       htsbuf_qprintf(hq, "http://%s%s?ticket=%s\n", host, buf, ticket_id);
 
       http_output_content(hc, "application/x-mpegURL");

@@ -84,16 +84,25 @@ access_ticket_timout(void *aux)
 }
 
 /**
- * Create a new ticket for the requested resource and generate a id for it
+ * Create a new ticket for the requested resource and generate a id for it.
+ * The time to live argument (ttl) is messured in minutes.
  */
 const char *
-access_ticket_create(const char *resource)
+access_ticket_create(const char *resource, int ttl)
 {
   uint8_t buf[20];
   char id[41];
   unsigned int i;
   access_ticket_t *at;
   static const char hex_string[16] = "0123456789ABCDEF";
+
+  //Min 5min tickets
+  if(!ttl)
+    ttl = 5;
+
+  //Max 24h tickets
+  if(ttl > 60*24)
+    ttl = 60*24;
 
   at = calloc(1, sizeof(access_ticket_t));
 
@@ -110,7 +119,7 @@ access_ticket_create(const char *resource)
   at->at_resource = strdup(resource);
 
   TAILQ_INSERT_TAIL(&access_tickets, at, at_link);
-  gtimer_arm(&at->at_timer, access_ticket_timout, at, 60*5);
+  gtimer_arm(&at->at_timer, access_ticket_timout, at, 60*ttl);
 
   return at->at_id;
 }

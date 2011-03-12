@@ -62,9 +62,10 @@ typedef struct access_ticket {
 #define ACCESS_FULL 0x3f
 
 /**
- * Create a new ticket for the requested resource and generate a id for it
+ * Create a new ticket for the requested resource and generate a id for it.
+ * The time to live argument (ttl) is messured in minutes.
  */
-const char* access_ticket_create(const char *resource);
+const char* access_ticket_create(const char *resource, int ttl);
 
 /**
  * Verifies that a given ticket id matches a resource
