@@ -125,7 +125,7 @@ page_static_file(http_connection_t *hc, const char *remain, void *opaque)
  * HTTP stream loop
  */
 static void
-http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
+http_stream_run(http_connection_t *hc, streaming_queue_t *sq, const char *filename)
 {
   streaming_message_t *sm;
   int run = 1;
@@ -178,7 +178,7 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
         int pcrpid = ss->ss_pcr_pid;
         int pmtpid = 0x0fff;
 
-        http_output_content(hc, "video/mp2t");
+        http_output_attachment(hc, "video/mp2t", filename);
         
         //Send PAT
         memset(pat_ts, 0xff, 188);
@@ -237,7 +237,7 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
 }
 
 /**
- * Output a playlist with http streams for a channel (.m3u format)
+ * Output a playlist with http streams for a channel (.m3u8 format)
  */
 static int
 http_stream_playlist(http_connection_t *hc, channel_t *channel)
@@ -262,7 +262,8 @@ http_stream_playlist(http_connection_t *hc, channel_t *channel)
     }
   }
 
-  http_output_content(hc, "application/x-mpegURL");
+  snprintf(buf, sizeof(buf), "%s.m3u8", channel? channel->ch_name : "channels");
+  http_output_attachment(hc, "application/vnd.apple.mpegurl", buf);
 
   pthread_mutex_unlock(&global_lock);
 
@@ -307,7 +308,8 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
       ticket_id = access_ticket_create(buf, durration);
       htsbuf_qprintf(hq, "http://%s%s?ticket=%s\n", host, buf, ticket_id);
 
-      http_output_content(hc, "application/x-mpegURL");
+      snprintf(buf, sizeof(buf), "%s.m3u8", de->de_title ? de->de_title : "recording");
+      http_output_attachment(hc, "application/vnd.apple.mpegurl", buf);
     }
   }
   pthread_mutex_unlock(&global_lock);
@@ -372,6 +374,7 @@ http_stream_service(http_connection_t *hc, service_t *service)
 {
   streaming_queue_t sq;
   th_subscription_t *s;
+  char buf[255];
 
   pthread_mutex_lock(&global_lock);
 
@@ -385,9 +388,10 @@ http_stream_service(http_connection_t *hc, service_t *service)
   pthread_mutex_unlock(&global_lock);
 
   //We won't get a START command, send http-header here.
-  http_output_content(hc, "video/mp2t");
+  snprintf(buf, sizeof(buf), "%s.ts", service->s_nicename);
+  http_output_attachment(hc, "video/mp2t", buf);
 
-  http_stream_run(hc, &sq);
+  http_stream_run(hc, &sq, buf);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -406,6 +410,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   streaming_queue_t sq;
   th_subscription_t *s;
   int priority = 150; //Default value, Compute this somehow
+  char buf[255];
 
   pthread_mutex_lock(&global_lock);
 
@@ -418,7 +423,8 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 
   pthread_mutex_unlock(&global_lock);
 
-  http_stream_run(hc, &sq);
+  snprintf(buf, sizeof(buf), "%s.ts", ch->ch_name);
+  http_stream_run(hc, &sq, buf);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
