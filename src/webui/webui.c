@@ -306,7 +306,7 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
       //htsbuf_qprintf(hq, "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%d\n", bandwidth);
 
       snprintf(buf, sizeof(buf), "/dvrfile/%d", dvr_id);
-      ticket_id = access_ticket_create(buf, durration);
+      ticket_id = access_ticket_create(buf, durration+5);
       htsbuf_qprintf(hq, "http://%s%s?ticket=%s\n", host, buf, ticket_id);
 
       snprintf(buf, sizeof(buf), "%s.m3u8", de->de_title ? de->de_title : "recording");
