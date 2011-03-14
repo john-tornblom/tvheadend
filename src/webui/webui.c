@@ -301,8 +301,9 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
       htsbuf_qprintf(hq, "#EXTM3U\n");
       htsbuf_qprintf(hq, "#EXTINF:%d,%s\n", durration, de->de_title);
 
-      htsbuf_qprintf(hq, "#EXT-X-TARGETDURATION:%d\n", durration);
-      htsbuf_qprintf(hq, "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%d\n", bandwidth);
+      //Only for apple products?
+      //htsbuf_qprintf(hq, "#EXT-X-TARGETDURATION:%d\n", durration);
+      //htsbuf_qprintf(hq, "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%d\n", bandwidth);
 
       snprintf(buf, sizeof(buf), "/dvrfile/%d", dvr_id);
       ticket_id = access_ticket_create(buf, durration);
