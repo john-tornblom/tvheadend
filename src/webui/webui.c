@@ -440,6 +440,9 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
  * Handle the http request. http://tvheadend/stream/channelid/<chid>
  *                          http://tvheadend/stream/channel/<chname>
  *                          http://tvheadend/stream/service/<servicename>
+ * POST/GET args:
+ *                 tr  - Request a ticket for the url.
+ *                 ttl - Time to live (in minutes) for a ticket request.
  */
 static int
 http_stream(http_connection_t *hc, const char *remain, void *opaque)
@@ -447,6 +450,11 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
   char *components[2];
   channel_t *ch = NULL;
   service_t *service = NULL;
+  htsbuf_queue_t *hq = &hc->hc_reply;
+  char *tr = NULL;
+  char *ttl = NULL;
+  const char *ticket_id = NULL;
+  char stream_url[256];
 
   hc->hc_keep_alive = 0;
 
@@ -455,6 +463,8 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
     return HTTP_STATUS_BAD_REQUEST;
   }
 
+  strcpy(stream_url, hc->hc_url);
+
   if(http_tokenize((char *)remain, components, 2, '/') != 2) {
     http_error(hc, HTTP_STATUS_BAD_REQUEST);
     return HTTP_STATUS_BAD_REQUEST;
@@ -462,9 +472,14 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
 
   http_deescape(components[1]);
 
+  tr = http_arg_get(&hc->hc_req_args, "tr");
+  ttl = http_arg_get(&hc->hc_req_args, "ttl");
+
   pthread_mutex_lock(&global_lock);
 
-  if(!strcmp(components[0], "channelid")) {
+  if(tr && atoi(tr)) {
+    ticket_id = access_ticket_create(stream_url, ttl ? atoi(ttl): 5);
+  } else if(!strcmp(components[0], "channelid")) {
     ch = channel_find_by_identifier(atoi(components[1]));
   } else if(!strcmp(components[0], "channel")) {
     ch = channel_find_by_name(components[1], 0, 0);
@@ -478,6 +493,10 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
     return http_stream_channel(hc, ch);
   } else if(service != NULL) {
     return http_stream_service(hc, service);
+  } else if(ticket_id != NULL) {
+    htsbuf_qprintf(hq, "%s", ticket_id);
+    http_output_content(hc, "text/plain");
+    return 0;
   } else {
     http_error(hc, HTTP_STATUS_BAD_REQUEST);
     return HTTP_STATUS_BAD_REQUEST;
