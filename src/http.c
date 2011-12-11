@@ -286,30 +286,6 @@ http_output_content(http_connection_t *hc, const char *content)
   return http_send_reply(hc, HTTP_STATUS_OK, content, NULL, NULL, 0);
 }
 
-/**
- * Send an HTTP OK, with disposition
- */
-void
-http_output_attachment(http_connection_t *hc, const char *content, 
-			const char *filename)
-{
-  char disposition[256];
-  char *ch;
-
-  snprintf(disposition, sizeof(disposition),
-	   "attachment; filename=%s", filename);
-
-  while((ch = strstr(disposition, " ")))
-    *ch = '_';
-
-  http_send_header(hc, HTTP_STATUS_OK, content, hc->hc_reply.hq_size,
-		   NULL, NULL, 10, 0, disposition);
-  
-  if(hc->hc_no_output)
-    return;
-
-  tcp_write_queue(hc->hc_fd, &hc->hc_reply);
-}
 
 
 /**

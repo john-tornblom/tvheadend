@@ -127,7 +127,7 @@ page_static_file(http_connection_t *hc, const char *remain, void *opaque)
  * HTTP stream loop
  */
 static void
-http_stream_run(http_connection_t *hc, streaming_queue_t *sq, const char *filename)
+http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
 {
   streaming_message_t *sm;
   int run = 1;
@@ -228,8 +228,7 @@ http_stream_playlist(http_connection_t *hc, channel_t *channel)
     }
   }
 
-  snprintf(buf, sizeof(buf), "%s.m3u8", channel? channel->ch_name : "channels");
-  http_output_attachment(hc, "audio/x-mpegurl", buf);
+  http_output_content(hc, "audio/x-mpegurl");
 
   pthread_mutex_unlock(&global_lock);
 
@@ -275,8 +274,7 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
       ticket_id = access_ticket_create(buf, durration+5);
       htsbuf_qprintf(hq, "http://%s%s?ticket=%s\n", host, buf, ticket_id);
 
-      snprintf(buf, sizeof(buf), "%s.m3u8", de->de_title ? de->de_title : "recording");
-      http_output_attachment(hc, "application/vnd.apple.mpegurl", buf);
+      http_output_content(hc, "application/x-mpegURL");
     }
   }
   pthread_mutex_unlock(&global_lock);
@@ -341,7 +339,6 @@ http_stream_service(http_connection_t *hc, service_t *service)
 {
   streaming_queue_t sq;
   th_subscription_t *s;
-  char buf[255];
 
   pthread_mutex_lock(&global_lock);
 
@@ -355,10 +352,9 @@ http_stream_service(http_connection_t *hc, service_t *service)
   pthread_mutex_unlock(&global_lock);
 
   //We won't get a START command, send http-header here.
-  snprintf(buf, sizeof(buf), "%s.ts", service->s_nicename);
-  http_output_attachment(hc, "video/mp2t", buf);
+  http_output_content(hc, "video/mp2t");
 
-  http_stream_run(hc, &sq, buf);
+  http_stream_run(hc, &sq);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -378,7 +374,6 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   th_subscription_t *s;
   streaming_target_t *st;
   int priority = 150; //Default value, Compute this somehow
-  char buf[255];
 
   streaming_queue_init(&sq, 0);
 #ifdef CONFIG_TRANSCODER
@@ -393,8 +388,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
                                        0);
   pthread_mutex_unlock(&global_lock);
 
-  snprintf(buf, sizeof(buf), "%s.ts", ch->ch_name);
-  http_stream_run(hc, &sq, buf);
+  http_stream_run(hc, &sq);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -413,9 +407,6 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
  * Handle the http request. http://tvheadend/stream/channelid/<chid>
  *                          http://tvheadend/stream/channel/<chname>
  *                          http://tvheadend/stream/service/<servicename>
- * POST/GET args:
- *                 tr  - Request a ticket for the url.
- *                 ttl - Time to live (in minutes) for a ticket request.
  */
 static int
 http_stream(http_connection_t *hc, const char *remain, void *opaque)
@@ -423,11 +414,6 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
   char *components[2];
   channel_t *ch = NULL;
   service_t *service = NULL;
-  htsbuf_queue_t *hq = &hc->hc_reply;
-  char *tr = NULL;
-  char *ttl = NULL;
-  const char *ticket_id = NULL;
-  char stream_url[256];
 
   hc->hc_keep_alive = 0;
 
@@ -436,8 +422,6 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
     return HTTP_STATUS_BAD_REQUEST;
   }
 
-  strcpy(stream_url, hc->hc_url);
-
   if(http_tokenize((char *)remain, components, 2, '/') != 2) {
     http_error(hc, HTTP_STATUS_BAD_REQUEST);
     return HTTP_STATUS_BAD_REQUEST;
@@ -445,14 +429,9 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
 
   http_deescape(components[1]);
 
-  tr = http_arg_get(&hc->hc_req_args, "tr");
-  ttl = http_arg_get(&hc->hc_req_args, "ttl");
-
   pthread_mutex_lock(&global_lock);
 
-  if(tr && atoi(tr)) {
-    ticket_id = access_ticket_create(stream_url, ttl ? atoi(ttl): 5);
-  } else if(!strcmp(components[0], "channelid")) {
+  if(!strcmp(components[0], "channelid")) {
     ch = channel_find_by_identifier(atoi(components[1]));
   } else if(!strcmp(components[0], "channel")) {
     ch = channel_find_by_name(components[1], 0, 0);
@@ -466,10 +445,6 @@ http_stream(http_connection_t *hc, const char *remain, void *opaque)
     return http_stream_channel(hc, ch);
   } else if(service != NULL) {
     return http_stream_service(hc, service);
-  } else if(ticket_id != NULL) {
-    htsbuf_qprintf(hq, "%s", ticket_id);
-    http_output_content(hc, "text/plain");
-    return 0;
   } else {
     http_error(hc, HTTP_STATUS_BAD_REQUEST);
     return HTTP_STATUS_BAD_REQUEST;
