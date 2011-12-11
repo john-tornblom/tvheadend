@@ -555,12 +555,6 @@ psi_parse_pmt(service_t *t, const uint8_t *ptr, int len, int chksvcid,
 	memcpy(lang, ptr, 3);
 	break;
 
-      case DVB_DESC_PRIVATE:
-	if(dlen == 4 && 
-	   ptr[0] == 'O' && ptr[1] == 'T' && ptr[2] == 'V' &&  ptr[3] == 0)
-	  hts_stream_type = SCT_OTV;
-	break;
-
       case DVB_DESC_TELETEXT:
 	if(estype == 0x06)
 	  hts_stream_type = SCT_TELETEXT;

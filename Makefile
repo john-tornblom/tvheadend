@@ -50,7 +50,6 @@ SRCS =  src/main.c \
 	src/subscriptions.c \
 	src/service.c \
 	src/psi.c \
-	src/otv.c \
 	src/parsers.c \
 	src/parser_h264.c \
 	src/parser_latm.c \
