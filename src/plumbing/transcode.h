@@ -1,5 +1,5 @@
-/*
- *  Matroska muxer
+/**
+ *  Transcoding
  *  Copyright (C) 2010 Andreas Öman
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -15,25 +15,12 @@
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#pragma once
 
-#ifndef MKMUX_H__
-#define MKMUX_H__
+#include "tvheadend.h"
 
-typedef struct mk_mux mk_mux_t;
-
-struct streaming_start;
-struct dvr_entry;
-struct th_pkt;
-
-mk_mux_t *mk_mux_create(const char *filename,
-			const struct streaming_start *ss,
-			const struct dvr_entry *de,
-			int write_tags);
-
-mk_mux_t *mk_mux_stream_create(int fd, const struct streaming_start *ss);
-
-int mk_mux_write_pkt(mk_mux_t *mkm, struct th_pkt *pkt);
-
-void mk_mux_close(mk_mux_t *mk_mux);
-
-#endif // MKMUX_H__
+streaming_target_t *transcoder_create(streaming_target_t *output, 
+				      size_t max_width, size_t max_height);
+void transcoder_set_network_speed(streaming_target_t *st, int speed);
+void transcoder_destroy(streaming_target_t *gh);
+void transcoder_init(void);

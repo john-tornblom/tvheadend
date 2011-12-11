@@ -69,6 +69,7 @@ SRCS =  src/main.c \
 	src/htsstr.c \
 	src/rawtsinput.c \
 	src/iptv_input.c \
+	src/avc.c \
 
 
 SRCS += src/plumbing/tsfix.c \
@@ -135,6 +136,16 @@ SRCS-$(CONFIG_AVAHI) += src/avahi.c
 ${BUILDDIR}/src/avahi.o : CFLAGS = \
                       $(shell pkg-config --cflags avahi-client) -Wall -Werror
 
+#
+# Transcoder
+#
+
+SRCS-$(CONFIG_TRANSCODER) += src/plumbing/transcode.c
+
+#${BUILDDIR}/src/plumbing/transcode.o : CFLAGS = \
+#                      $(shell pkg-config --cflags libavcode libcwscale) -Wall -Werror
+
+
 # Various transformations
 SRCS  += $(SRCS-yes)
 DLIBS += $(DLIBS-yes)
@@ -182,7 +193,7 @@ $(OBJDIRS):
 	@mkdir -p $@
 
 ${BUILDDIR}/%.o: %.c
-	$(CC) -MD $(CFLAGS_com) $(CFLAGS) $(CFLAGS_cfg) -c -o $@ $(CURDIR)/$<
+	$(CC) -MD -MP $(CFLAGS_com) $(CFLAGS) $(CFLAGS_cfg) -c -o $@ $(CURDIR)/$<
 
 ${BUILDDIR}/%.so: ${SRCS_EXTRA}
 	${CC} -O -fbuiltin -fomit-frame-pointer -fPIC -shared -o $@ $< -ldl
