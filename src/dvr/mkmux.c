@@ -215,6 +215,11 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
       codec_id = "A_EAC3";
       break;
 
+    case SCT_MP3:
+      tracktype = 2;
+      codec_id = "A_MPEG/L3";
+      break;
+
     case SCT_AAC:
       tracktype = 2;
       codec_id = "A_AAC";
