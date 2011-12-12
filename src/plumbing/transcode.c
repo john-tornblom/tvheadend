@@ -176,10 +176,14 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   av_init_packet(&packet);
   packet.data = pktbuf_ptr(pkt->pkt_payload);
   packet.size = pktbuf_len(pkt->pkt_payload);
-  packet.pts  = ts->dec_frame->pts = pkt->pkt_pts;
+  if(pkt->pkt_pts == PTS_UNSET)
+    packet.pts  = pkt->pkt_dts;
+  else
+    packet.pts  =  pkt->pkt_pts;
   packet.dts  = pkt->pkt_dts;
   packet.duration = pkt->pkt_duration;
 
+  ts->enc_frame->pts = ts->dec_frame->pts = packet.pts;
   length = avcodec_decode_video2(ts->sctx, ts->dec_frame, &got_picture, &packet);
 
   if(length <= 0) {
@@ -241,11 +245,13 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
             ts->enc_frame->data, 
             ts->enc_frame->linesize);
  
-  ts->enc_frame->pts = ts->dec_frame->pts;
-
   len = avpicture_get_size(ts->tctx->pix_fmt, ts->sctx->width, ts->sctx->height);
   out = av_malloc(len + FF_INPUT_BUFFER_PADDING_SIZE);
   memset(out, 0, len);
+
+  if(ts->sctx->coded_frame && ts->sctx->coded_frame->pts != AV_NOPTS_VALUE) {
+    ts->enc_frame->pts = ts->dec_frame->pts;
+  }
 
   length = avcodec_encode_video(ts->tctx, out, len, ts->enc_frame);
   if(length <= 0) {
@@ -255,11 +261,9 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   
   n = pkt_alloc(out, length, ts->enc_frame->pts, pkt->pkt_dts);
 
-  if(n->pkt_pts == PTS_UNSET)
-    n->pkt_pts = pkt->pkt_pts;
-
-  if(n->pkt_pts == PTS_UNSET)
-    n->pkt_pts = pkt->pkt_dts;
+  if(ts->tctx->coded_frame && ts->tctx->coded_frame->pts != AV_NOPTS_VALUE) {
+    n->pkt_pts = ts->tctx->coded_frame->pts;
+  }
 
   if(ts->enc_frame->pict_type & FF_I_TYPE)
     n->pkt_frametype = PKT_I_FRAME;
