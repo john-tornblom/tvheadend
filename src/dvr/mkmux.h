@@ -30,9 +30,13 @@ mk_mux_t *mk_mux_create(const char *filename,
 			const struct dvr_entry *de,
 			int write_tags);
 
-mk_mux_t *mk_mux_stream_create(int fd, const struct streaming_start *ss);
+mk_mux_t *mk_mux_stream_create(int fd,
+			       const struct streaming_start *ss,
+			       const event_t *e);
 
 int mk_mux_write_pkt(mk_mux_t *mkm, struct th_pkt *pkt);
+
+int mk_mux_write_meta(mk_mux_t *mkm, event_t *e);
 
 void mk_mux_close(mk_mux_t *mk_mux);
 

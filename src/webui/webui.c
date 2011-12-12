@@ -127,7 +127,7 @@ page_static_file(http_connection_t *hc, const char *remain, void *opaque)
  * HTTP stream loop
  */
 static void
-http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
+http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t *s)
 {
   streaming_message_t *sm;
   int run = 1;
@@ -171,14 +171,17 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq)
     case SMT_PACKET:
       pkt_ref_inc(sm->sm_data);
       run = !mk_mux_write_pkt(mkm, sm->sm_data);
+      sm->sm_data = NULL;
       break;
 
-    case SMT_START:
+    case SMT_START: {
       start = 0;
       http_output_content(hc, "video/x-matroska");
-      mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data);
-      break;
 
+      event_t *e = epg_event_find_by_time(s->ths_channel, dispatch_clock);
+      mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data, e);
+      break;
+    }
     case SMT_STOP:
       run = 0;
       break;
@@ -354,7 +357,7 @@ http_stream_service(http_connection_t *hc, service_t *service)
   //We won't get a START command, send http-header here.
   http_output_content(hc, "video/mp2t");
 
-  http_stream_run(hc, &sq);
+  http_stream_run(hc, &sq, s);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -388,7 +391,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
                                        0);
   pthread_mutex_unlock(&global_lock);
 
-  http_stream_run(hc, &sq);
+  http_stream_run(hc, &sq, s);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);

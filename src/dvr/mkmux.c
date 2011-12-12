@@ -515,6 +515,64 @@ mk_build_metadata(const dvr_entry_t *de)
  *
  */
 static htsbuf_queue_t *
+mk_build_metadata2(const event_t *e)
+{
+  htsbuf_queue_t *q = htsbuf_queue_alloc(0);
+  char datestr[64];
+  struct tm tm;
+  const char *ctype;
+  localtime_r(&e->e_start, &tm);
+
+  snprintf(datestr, sizeof(datestr),
+	   "%04d-%02d-%02d %02d:%02d:%02d",
+	   tm.tm_year + 1900,
+	   tm.tm_mon + 1,
+	   tm.tm_mday,
+	   tm.tm_hour,
+	   tm.tm_min,
+	   tm.tm_sec);
+
+  addtag(q, build_tag_string("DATE_BROADCASTED", datestr, 0, NULL));
+
+  addtag(q, build_tag_string("ORIGINAL_MEDIA_TYPE", "TV", 0, NULL));
+
+  
+  if(e->e_content_type) {
+    ctype = epg_content_group_get_name(e->e_content_type);
+    if(ctype != NULL)
+      addtag(q, build_tag_string("CONTENT_TYPE", ctype, 0, NULL));
+  }
+
+  if(e->e_channel != NULL)
+    addtag(q, build_tag_string("TVCHANNEL", e->e_channel->ch_name, 0, NULL));
+
+  if(e->e_episode.ee_onscreen)
+    addtag(q, build_tag_string("SYNOPSIS", 
+			       e->e_episode.ee_onscreen, 0, NULL));
+
+  if(e->e_desc != NULL)
+    addtag(q, build_tag_string("SUMMARY", e->e_desc, 0, NULL));
+
+  if(e->e_episode.ee_season)
+    addtag(q, build_tag_int("PART_NUMBER", e->e_episode.ee_season,
+			    60, "SEASON"));
+
+  if(e->e_episode.ee_episode)
+    addtag(q, build_tag_int("PART_NUMBER", e->e_episode.ee_episode,
+			    0, NULL));
+
+  if(e->e_episode.ee_part)
+    addtag(q, build_tag_int("PART_NUMBER", e->e_episode.ee_part,
+			    40, "PART"));
+
+  return q;
+}
+
+
+/**
+ *
+ */
+static htsbuf_queue_t *
 mk_build_one_metaseek(mk_mux_t *mkm, uint32_t id, off_t pos)
 {
   htsbuf_queue_t *q = htsbuf_queue_alloc(0);
@@ -638,7 +696,7 @@ mk_mux_create(const char *filename,
  *
  */
 mk_mux_t *
-mk_mux_stream_create(int fd, const struct streaming_start *ss)
+mk_mux_stream_create(int fd, const struct streaming_start *ss, const event_t *e)
 {
   mk_mux_t *mkm;
 
@@ -646,7 +704,7 @@ mk_mux_stream_create(int fd, const struct streaming_start *ss)
   getuuid(mkm->uuid);
   mkm->filename = strdup("Live stream");
   mkm->fd = fd;
-  mkm->title = strdup("Live stream");
+  mkm->title = strdup(e ? e->e_title : mkm->filename);
   TAILQ_INIT(&mkm->cues);
 
   mk_write_master(mkm, 0x1a45dfa3, mk_build_ebmlheader());
@@ -664,14 +722,12 @@ mk_mux_stream_create(int fd, const struct streaming_start *ss)
   mkm->trackinfo_pos = mkm->fdpos;
   mk_write_master(mkm, 0x1654ae6b, mk_build_tracks(mkm, ss));
 
-  /*
-  if(write_tags) {
+  if(e) {
     mkm->metadata_pos = mkm->fdpos;
-    mk_write_master(mkm, 0x1254c367, mk_build_metadata(de));
+    mk_write_master(mkm, 0x1254c367, mk_build_metadata2(e));
   }
  
-  mk_write_metaseek(mkm, 0);
-  */
+  //mk_write_metaseek(mkm, 0);
   return mkm;
 }
 /**
