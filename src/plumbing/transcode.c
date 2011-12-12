@@ -376,7 +376,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 
       streaming_start_component_t *ssc = &ss->ss_components[0];
       ssc->ssc_index    = ssc_src->ssc_index;
-      ssc->ssc_type     = SCT_MPEG2AUDIO;
+      ssc->ssc_type     = SCT_MP3;
       ssc->ssc_sri      = ssc_src->ssc_sri;
       ssc->ssc_channels = ssc_src->ssc_channels;
       memcpy(ssc->ssc_lang, ssc_src->ssc_lang, 4);
