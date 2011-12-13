@@ -713,7 +713,7 @@ mk_mux_stream_create(int fd, const struct streaming_start *ss, const event_t *e)
   mk_write_segment_header(mkm, 0);
 
   mkm->segment_pos = mkm->fdpos;
-  mk_write_metaseek(mkm, 1); // Must be first in segment
+  //mk_write_metaseek(mkm, 1); // Must be first in segment
 
 
   mkm->segmentinfo_pos = mkm->fdpos;
