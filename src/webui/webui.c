@@ -386,7 +386,11 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   streaming_queue_init(&sq, 0);
   tsfix = tsfix_create(&sq.sq_st);
 #ifdef CONFIG_TRANSCODER
-  streaming_target_t *tr = transcoder_create(tsfix, 480, 384);
+  streaming_target_t *tr = transcoder_create(tsfix, 
+					     480, 
+					     384,
+					     SCT_MPEG2VIDEO,
+					     SCT_MP3);
   gh = globalheaders_create(tr);
 #else
   gh = globalheaders_create(tsfix);

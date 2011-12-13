@@ -921,7 +921,11 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 
 #ifdef CONFIG_TRANSCODER
   if(max_width && max_height) {
-    hs->hs_transcoder = transcoder_create(&hs->hs_input, max_width, max_height);
+    hs->hs_transcoder = transcoder_create(&hs->hs_input, 
+					  max_width, 
+					  max_height,
+					  SCT_MPEG2VIDEO,
+					  SCT_MPEG2AUDIO);
   }
   hs->hs_s =
     subscription_create_from_channel(ch, weight,

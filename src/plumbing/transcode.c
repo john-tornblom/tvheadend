@@ -28,6 +28,7 @@
  * Reference to a transcoder stream
  */
 typedef struct transcoder_stream {
+  streaming_component_type_t ttype;
   AVCodecContext *sctx; // source
   AVCodecContext *tctx; // target
   int            index; // refers to the stream index
@@ -62,8 +63,9 @@ typedef struct transcoder {
  * allocate the buffers used by a transcoder stream
  */
 static void
-transcoder_stream_create(transcoder_stream_t *ts)
+transcoder_stream_create(transcoder_stream_t *ts, streaming_component_type_t type)
 {
+  ts->ttype = type;
   ts->sctx = avcodec_alloc_context();
   ts->tctx = avcodec_alloc_context();
   ts->dec_frame = avcodec_alloc_frame();
@@ -130,7 +132,18 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   ts->tctx->time_base.num   = 1;
 
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
-    AVCodec *codec = avcodec_find_encoder(CODEC_ID_MP3);
+    switch(ts->ttype) {
+    case SCT_MP3:
+      ts->tctx->codec_id = CODEC_ID_MP3;
+      break;
+    case SCT_MPEG2AUDIO:
+      ts->tctx->codec_id = CODEC_ID_MP2;
+      break;
+    default:
+      ts->tctx->codec_id = CODEC_ID_NONE;
+      break;
+    }
+    AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
     if(!codec || avcodec_open(ts->tctx, codec) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find audio encoder");
       goto cleanup;
@@ -202,12 +215,22 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   ts->tctx->sample_aspect_ratio.den = pkt->pkt_aspect_den;
 
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
-    ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
-    ts->tctx->flags                |= CODEC_FLAG_QSCALE;
-    ts->tctx->rc_lookahead          = 0;
-    ts->tctx->max_b_frames          = 0;
-
-    AVCodec *codec = avcodec_find_encoder(CODEC_ID_MPEG2VIDEO);
+    switch(ts->ttype) {
+    case SCT_MPEG2VIDEO:
+      ts->tctx->codec_id              = CODEC_ID_MPEG2VIDEO;
+      ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
+      ts->tctx->flags                |= CODEC_FLAG_QSCALE;
+      ts->tctx->rc_lookahead          = 0;
+      ts->tctx->max_b_frames          = 0;
+      ts->tctx->qmin                  = 1;
+      ts->tctx->qmax                  = FF_LAMBDA_MAX;
+      break;
+    default:
+      ts->tctx->codec_id = CODEC_ID_NONE;
+      break;
+    }
+    
+    AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
     if(!codec || avcodec_open(ts->tctx, codec) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find video encoder");
       ts->tctx->codec_id = CODEC_ID_NONE;
@@ -376,7 +399,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 
       streaming_start_component_t *ssc = &ss->ss_components[0];
       ssc->ssc_index    = ssc_src->ssc_index;
-      ssc->ssc_type     = SCT_MP3;
+      ssc->ssc_type     = t->ts_audio.ttype;
       ssc->ssc_sri      = ssc_src->ssc_sri;
       ssc->ssc_channels = ssc_src->ssc_channels;
       memcpy(ssc->ssc_lang, ssc_src->ssc_lang, 4);
@@ -397,7 +420,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       streaming_start_component_t *ssc = &ss->ss_components[1];
 
       ssc->ssc_index         = ssc_src->ssc_index;
-      ssc->ssc_type          = SCT_MPEG2VIDEO;
+      ssc->ssc_type          = t->ts_video.ttype;
       ssc->ssc_aspect_num    = ssc_src->ssc_aspect_num;
       ssc->ssc_aspect_den    = ssc_src->ssc_aspect_den;
       ssc->ssc_height        = MIN(t->max_height, ssc_src->ssc_height);
@@ -409,8 +432,6 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       t->ts_video.tctx->codec_type         = AVMEDIA_TYPE_VIDEO;
       t->ts_video.tctx->width              = ssc->ssc_width;
       t->ts_video.tctx->height             = ssc->ssc_height;
-      t->ts_video.tctx->qmin               = 1;
-      t->ts_video.tctx->qmax               = FF_LAMBDA_MAX;
 
       tvhlog(LOG_INFO, "transcode", "%s %dx%d ==> %s %dx%d", 
 	     streaming_component_type2txt(ssc_src->ssc_type),
@@ -495,7 +516,10 @@ transcoder_input(void *opaque, streaming_message_t *sm)
  *
  */
 streaming_target_t *
-transcoder_create(streaming_target_t *output, size_t max_width, size_t max_height)
+transcoder_create(streaming_target_t *output, 
+		  size_t max_width, size_t max_height,
+		  streaming_component_type_t v_codec, 
+		  streaming_component_type_t a_codec)
 {
   transcoder_t *t = calloc(1, sizeof(transcoder_t));
 
@@ -504,8 +528,8 @@ transcoder_create(streaming_target_t *output, size_t max_width, size_t max_heigh
   t->max_width = max_width;
   t->max_height = max_height;
 
-  transcoder_stream_create(&t->ts_video);
-  transcoder_stream_create(&t->ts_audio);
+  transcoder_stream_create(&t->ts_video, v_codec);
+  transcoder_stream_create(&t->ts_audio, a_codec);
 
   streaming_target_init(&t->t_input, transcoder_input, t, 0);
   return &t->t_input;
