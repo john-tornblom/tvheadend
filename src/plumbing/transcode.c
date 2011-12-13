@@ -162,7 +162,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   n->pkt_componentindex = pkt->pkt_componentindex;
   n->pkt_frametype = pkt->pkt_frametype;
   n->pkt_field = pkt->pkt_field;
-  n->pkt_channels = pkt->pkt_channels;
+  n->pkt_channels = ts->tctx->channels;
   n->pkt_sri = pkt->pkt_sri;
   n->pkt_aspect_num = pkt->pkt_aspect_num;
   n->pkt_aspect_den = pkt->pkt_aspect_den;
@@ -401,7 +401,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       ssc->ssc_index    = ssc_src->ssc_index;
       ssc->ssc_type     = t->ts_audio.ttype;
       ssc->ssc_sri      = ssc_src->ssc_sri;
-      ssc->ssc_channels = ssc_src->ssc_channels;
+      ssc->ssc_channels = MIN(2, ssc_src->ssc_channels);
       memcpy(ssc->ssc_lang, ssc_src->ssc_lang, 4);
 
       t->ts_audio.sctx->codec_type = AVMEDIA_TYPE_AUDIO;
