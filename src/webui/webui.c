@@ -380,13 +380,13 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 {
   streaming_queue_t sq;
   th_subscription_t *s;
-  streaming_target_t *tr, *gh, *tsfix;
+  streaming_target_t *gh, *tsfix;
   int priority = 150; //Default value, Compute this somehow
 
   streaming_queue_init(&sq, 0);
   tsfix = tsfix_create(&sq.sq_st);
 #ifdef CONFIG_TRANSCODER
-  tr = transcoder_create(tsfix, 480, 384);
+  streaming_target_t *tr = transcoder_create(tsfix, 480, 384);
   gh = globalheaders_create(tr);
 #else
   gh = globalheaders_create(tsfix);
