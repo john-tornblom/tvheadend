@@ -37,6 +37,8 @@
 #include "dvr/mkmux.h"
 #include "filebundle.h"
 #include "psi.h"
+#include "plumbing/tsfix.h"
+#include "plumbing/globalheaders.h"
 #include "plumbing/transcode.h"
 
 struct filebundle *filebundles;
@@ -378,19 +380,21 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 {
   streaming_queue_t sq;
   th_subscription_t *s;
-  streaming_target_t *st;
+  streaming_target_t *tr, *gh, *tsfix;
   int priority = 150; //Default value, Compute this somehow
 
   streaming_queue_init(&sq, 0);
+  tsfix = tsfix_create(&sq.sq_st);
 #ifdef CONFIG_TRANSCODER
-  st = transcoder_create(&sq.sq_st, 640, 480);
+  tr = transcoder_create(tsfix, 480, 384);
+  gh = globalheaders_create(tr);
 #else
-  st = &sq.sq_st;
+  gh = globalheaders_create(tsfix);
 #endif
 
   pthread_mutex_lock(&global_lock);
   s = subscription_create_from_channel(ch, priority, 
-                                       "HTTP", st,
+                                       "HTTP", gh,
                                        0);
   pthread_mutex_unlock(&global_lock);
 
@@ -400,10 +404,11 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   subscription_unsubscribe(s);
   pthread_mutex_unlock(&global_lock);
 
+  globalheaders_destroy(gh);
 #ifdef CONFIG_TRANSCODER
-  transcoder_destroy(st);
+  transcoder_destroy(tr);
 #endif
-
+  tsfix_destroy(tsfix);
   streaming_queue_deinit(&sq);
   return 0;
 }
