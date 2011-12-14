@@ -115,7 +115,6 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   len = AVCODEC_MAX_AUDIO_FRAME_SIZE*2;
   length = avcodec_decode_audio3(ts->sctx, ts->dec_sample, &len, &packet);
-
   if(length <= 0) {
     tvhlog(LOG_ERR, "transcode", "Unable to decode audio (%d)", length);
     goto cleanup;
@@ -135,9 +134,17 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     switch(ts->ttype) {
     case SCT_MP3:
       ts->tctx->codec_id = CODEC_ID_MP3;
+      ts->tctx->flags   |= CODEC_FLAG_QSCALE;
       break;
     case SCT_MPEG2AUDIO:
       ts->tctx->codec_id = CODEC_ID_MP2;
+      break;
+    case SCT_AAC:
+      ts->tctx->codec_id = CODEC_ID_AAC;
+      ts->tctx->flags   |= CODEC_FLAG_QSCALE;
+      break;
+    case SCT_AC3:
+      ts->tctx->codec_id = CODEC_ID_AC3;
       break;
     default:
       ts->tctx->codec_id = CODEC_ID_NONE;
@@ -209,13 +216,13 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     goto cleanup;
   }
 
-  ts->tctx->time_base.den = ts->sctx->time_base.den;
-  ts->tctx->time_base.num = ts->sctx->time_base.num;
-
   ts->tctx->sample_aspect_ratio.num = pkt->pkt_aspect_num;
   ts->tctx->sample_aspect_ratio.den = pkt->pkt_aspect_den;
 
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
+      ts->tctx->time_base.den = 25;
+      ts->tctx->time_base.num = 1;
+
     switch(ts->ttype) {
     case SCT_MPEG2VIDEO:
       ts->tctx->codec_id              = CODEC_ID_MPEG2VIDEO;
@@ -225,6 +232,45 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->max_b_frames          = 0;
       ts->tctx->qmin                  = 1;
       ts->tctx->qmax                  = FF_LAMBDA_MAX;
+      ts->tctx->flags                |= CODEC_FLAG_GLOBAL_HEADER;
+      break;
+    case SCT_H264:
+      ts->tctx->codec_id              = CODEC_ID_H264;
+      ts->tctx->coder_type            = 0; // coder = 1
+      ts->tctx->flags                |= CODEC_FLAG_LOOP_FILTER; // flags=+loop
+      ts->tctx->me_cmp               |= FF_CMP_CHROMA; // cmp=+chroma
+      ts->tctx->partitions           |= (X264_PART_I8X8 + X264_PART_I4X4 + X264_PART_P8X8 + X264_PART_B8X8); // partitions=+parti8x8+parti4x4+partp8x8+partb8x8
+      ts->tctx->me_method             = 0;//ME_HEX; // me_method=hex
+      ts->tctx->me_subpel_quality     = 7; // subq=7
+      ts->tctx->me_range              = 16; // me_range=16
+      ts->tctx->gop_size              = 250; // g=250
+      ts->tctx->keyint_min            = 25; // keyint_min=25
+      ts->tctx->scenechange_threshold = 40; // sc_threshold=40
+      ts->tctx->i_quant_factor        = 0.71; // i_qfactor=0.71
+      ts->tctx->b_frame_strategy      = 1; // b_strategy=1
+      ts->tctx->qcompress             = 0.6; // qcomp=0.6
+      ts->tctx->qmin                  = 10; // qmin=10
+      ts->tctx->qmax                  = 51; // qmax=51
+      ts->tctx->max_qdiff             = 4; // qdiff=4
+      ts->tctx->max_b_frames          = 3; // bf=3
+      ts->tctx->refs                  = 3; // refs=3
+      ts->tctx->directpred            = 1; // directpred=1
+      ts->tctx->trellis               = 1; // trellis=1
+      ts->tctx->flags2               |= CODEC_FLAG2_FASTPSKIP; // flags2=+bpyramid+mixed_refs+wpred+dct8x8+fastpskip
+      ts->tctx->weighted_p_pred       = 2; // wpredp=2
+
+      ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
+      ts->tctx->dsp_mask              = (FF_MM_MMX | FF_MM_MMXEXT | FF_MM_SSE);
+      ts->tctx->rc_lookahead          = 0;
+      ts->tctx->max_b_frames          = 0;
+      ts->tctx->b_frame_strategy      = 1;
+      ts->tctx->chromaoffset          = 0;
+      ts->tctx->thread_count          = 1;
+      ts->tctx->crf                   = 10;
+      ts->tctx->cqp                   = -1;
+      ts->tctx->bit_rate              = 0;
+      ts->tctx->bit_rate_tolerance    = 0;
+      ts->tctx->flags                |= CODEC_FLAG_GLOBAL_HEADER;
       break;
     default:
       ts->tctx->codec_id = CODEC_ID_NONE;
