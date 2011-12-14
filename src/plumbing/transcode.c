@@ -117,7 +117,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   length = avcodec_decode_audio3(ts->sctx, ts->dec_sample, &len, &packet);
 
   if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to decode audio");
+    tvhlog(LOG_ERR, "transcode", "Unable to decode audio (%d)", length);
     goto cleanup;
   }
 
@@ -152,7 +152,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   length = avcodec_encode_audio(ts->tctx, ts->enc_sample, AVCODEC_MAX_AUDIO_FRAME_SIZE*2, ts->dec_sample);
   if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to encode audio");
+    tvhlog(LOG_ERR, "transcode", "Unable to encode audio (%d)", length);
     goto cleanup;
   }
 
@@ -200,7 +200,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   length = avcodec_decode_video2(ts->sctx, ts->dec_frame, &got_picture, &packet);
 
   if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to decode video");
+    tvhlog(LOG_ERR, "transcode", "Unable to decode video (%d)", length);
     goto cleanup;
   }
 
@@ -278,7 +278,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   length = avcodec_encode_video(ts->tctx, out, len, ts->enc_frame);
   if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to encode video");
+    tvhlog(LOG_ERR, "transcode", "Unable to encode video (%d)", length);
     goto cleanup;
   }
   
@@ -406,6 +406,10 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 
       t->ts_audio.sctx->codec_type = AVMEDIA_TYPE_AUDIO;
       t->ts_audio.tctx->codec_type = AVMEDIA_TYPE_AUDIO;
+
+      tvhlog(LOG_INFO, "transcode", "%s ==> %s", 
+	     streaming_component_type2txt(ssc_src->ssc_type),
+	     streaming_component_type2txt(ssc->ssc_type));
     }
 
     if (!t->ts_video.index && SCT_ISVIDEO(ssc_src->ssc_type)) {
