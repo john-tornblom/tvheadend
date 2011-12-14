@@ -288,10 +288,6 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   
   n = pkt_alloc(out, length, ts->enc_frame->pts, pkt->pkt_dts);
 
-  if(ts->tctx->coded_frame && ts->tctx->coded_frame->pts != AV_NOPTS_VALUE) {
-    n->pkt_pts = ts->tctx->coded_frame->pts;
-  }
-
   if(ts->enc_frame->pict_type & FF_I_TYPE)
     n->pkt_frametype = PKT_I_FRAME;
   else if(ts->enc_frame->pict_type & FF_P_TYPE)
@@ -313,6 +309,9 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   n->pkt_aspect_num = pkt->pkt_aspect_num;
   n->pkt_aspect_den = pkt->pkt_aspect_den;
   
+  if(ts->tctx->coded_frame && ts->tctx->coded_frame->pts != AV_NOPTS_VALUE) {
+    n->pkt_pts = ts->tctx->coded_frame->pts;
+  }
   if(ts->tctx->extradata_size) {
     n->pkt_header = pktbuf_alloc(ts->tctx->extradata, ts->tctx->extradata_size);
   }
