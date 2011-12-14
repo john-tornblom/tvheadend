@@ -384,21 +384,22 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   int priority = 150; //Default value, Compute this somehow
 
   streaming_queue_init(&sq, 0);
-  tsfix = tsfix_create(&sq.sq_st);
+  gh = globalheaders_create(&sq.sq_st);
 #ifdef CONFIG_TRANSCODER
-  streaming_target_t *tr = transcoder_create(tsfix, 
+  streaming_target_t *tr = transcoder_create(gh, 
 					     480, 
 					     384,
 					     SCT_MPEG2VIDEO,
 					     SCT_MP3);
-  gh = globalheaders_create(tr);
+  tsfix = tsfix_create(tr);
 #else
-  gh = globalheaders_create(tsfix);
+  gh = globalheaders_create(&sq.sq_st);
+  tsfix = tsfix_create(gh);
 #endif
 
   pthread_mutex_lock(&global_lock);
   s = subscription_create_from_channel(ch, priority, 
-                                       "HTTP", gh,
+                                       "HTTP", tsfix,
                                        0);
   pthread_mutex_unlock(&global_lock);
 
