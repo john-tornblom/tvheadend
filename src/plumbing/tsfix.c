@@ -318,6 +318,10 @@ tsfix_input_packet(tsfix_t *tf, streaming_message_t *sm)
       tf->tf_tsref = pkt->pkt_dts;
       tsfixprintf("reference clock set to %"PRId64"\n", tf->tf_tsref);
   }
+  if(tf->tf_tsref == PTS_UNSET) {
+    pkt_ref_dec(pkt);
+    return;
+  }
 
   if(pkt->pkt_dts == PTS_UNSET) {
 
