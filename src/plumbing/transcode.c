@@ -174,10 +174,10 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   n->pkt_aspect_num = pkt->pkt_aspect_num;
   n->pkt_aspect_den = pkt->pkt_aspect_den;
 
-  
   if(ts->tctx->extradata_size) {
     n->pkt_header = pktbuf_alloc(ts->tctx->extradata, ts->tctx->extradata_size);
   }
+
  cleanup:
   av_free_packet(&packet);
   return n;
