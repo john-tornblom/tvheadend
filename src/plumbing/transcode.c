@@ -193,16 +193,13 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   av_init_packet(&packet);
   packet.data = pktbuf_ptr(pkt->pkt_payload);
   packet.size = pktbuf_len(pkt->pkt_payload);
-  if(pkt->pkt_pts == PTS_UNSET)
-    packet.pts  = pkt->pkt_dts;
-  else
-    packet.pts  =  pkt->pkt_pts;
+  packet.pts  = pkt->pkt_pts;
   packet.dts  = pkt->pkt_dts;
   packet.duration = pkt->pkt_duration;
 
   ts->enc_frame->pts = ts->dec_frame->pts = packet.pts;
+  ts->sctx->reordered_opaque = packet.pts;
   length = avcodec_decode_video2(ts->sctx, ts->dec_frame, &got_picture, &packet);
-
   if(length <= 0) {
     tvhlog(LOG_ERR, "transcode", "Unable to decode video (%d)", length);
     goto cleanup;
@@ -276,7 +273,10 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   out = av_malloc(len + FF_INPUT_BUFFER_PADDING_SIZE);
   memset(out, 0, len);
 
-  if(ts->sctx->coded_frame && ts->sctx->coded_frame->pts != AV_NOPTS_VALUE) {
+  if(ts->dec_frame->reordered_opaque != AV_NOPTS_VALUE) {
+    ts->enc_frame->pts = ts->dec_frame->reordered_opaque;
+  }
+  else if(ts->sctx->coded_frame && ts->sctx->coded_frame->pts != AV_NOPTS_VALUE) {
     ts->enc_frame->pts = ts->dec_frame->pts;
   }
 
