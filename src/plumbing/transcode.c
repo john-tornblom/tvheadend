@@ -126,8 +126,8 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   ts->tctx->bit_rate        = ts->tctx->channels * 64000;
   ts->tctx->sample_rate     = ts->sctx->sample_rate;
   ts->tctx->sample_fmt      = ts->sctx->sample_fmt;
-  ts->tctx->frame_size      = ts->sctx->frame_size;
-  ts->tctx->block_align     = ts->sctx->block_align;
+  //ts->tctx->frame_size      = ts->sctx->frame_size;
+  //ts->tctx->block_align     = ts->sctx->block_align;
   ts->tctx->time_base.den   = ts->tctx->sample_rate;
   ts->tctx->time_base.num   = 1;
 
