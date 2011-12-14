@@ -200,6 +200,11 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
       codec_id = "V_MPEG4/ISO/AVC";
       break;
 
+   case SCT_VP8:
+      tracktype = 1;
+      codec_id = "V_VP8";
+      break;
+
     case SCT_MPEG2AUDIO:
       tracktype = 2;
       codec_id = "A_MPEG/L2";
@@ -213,6 +218,11 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
     case SCT_EAC3:
       tracktype = 2;
       codec_id = "A_EAC3";
+      break;
+
+    case SCT_VORBIS:
+      tracktype = 2;
+      codec_id = "A_VORBIS";
       break;
 
     case SCT_MP3:
@@ -258,6 +268,7 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
     case SCT_H264:
     case SCT_MPEG2VIDEO:
     case SCT_AAC:
+    case SCT_VORBIS:
       if(ssc->ssc_gh)
 	ebml_append_bin(t, 0x63a2, 
 			pktbuf_ptr(ssc->ssc_gh),

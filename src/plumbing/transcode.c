@@ -146,6 +146,10 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     case SCT_AC3:
       ts->tctx->codec_id = CODEC_ID_AC3;
       break;
+    case SCT_VORBIS:
+      ts->tctx->codec_id = CODEC_ID_VORBIS;
+      ts->tctx->flags   |= CODEC_FLAG_QSCALE;
+      break;
     default:
       ts->tctx->codec_id = CODEC_ID_NONE;
       break;
@@ -233,6 +237,18 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->qmin                  = 1;
       ts->tctx->qmax                  = FF_LAMBDA_MAX;
       ts->tctx->flags                |= CODEC_FLAG_GLOBAL_HEADER;
+      break;
+    case SCT_VP8:
+      ts->tctx->codec_id              = CODEC_ID_VP8;
+      ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
+      ts->tctx->flags                |= CODEC_FLAG_QSCALE;
+      ts->tctx->rc_lookahead          = 1;
+      ts->tctx->max_b_frames          = 1;
+      ts->tctx->qmin                  = 1;
+      ts->tctx->qmax                  = 63;
+      ts->tctx->bit_rate              = 750 * 1000;
+      ts->tctx->rc_min_rate           = ts->tctx->bit_rate;
+      ts->tctx->rc_max_rate           = ts->tctx->bit_rate;
       break;
     case SCT_H264:
       ts->tctx->codec_id              = CODEC_ID_H264;

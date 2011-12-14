@@ -876,6 +876,7 @@ static struct strtab streamtypetab[] = {
   { "MPEG2VIDEO", SCT_MPEG2VIDEO },
   { "MPEG2AUDIO", SCT_MPEG2AUDIO },
   { "H264",       SCT_H264 },
+  { "VP8",        SCT_VP8 },
   { "AC3",        SCT_AC3 },
   { "TELETEXT",   SCT_TELETEXT },
   { "DVBSUB",     SCT_DVBSUB },
@@ -887,6 +888,7 @@ static struct strtab streamtypetab[] = {
   { "TEXTSUB",    SCT_TEXTSUB },
   { "EAC3",       SCT_EAC3 },
   { "MP3",        SCT_MP3 },
+  { "VORBIS",     SCT_VORBIS },
 };
 
 
