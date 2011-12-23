@@ -389,8 +389,8 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   streaming_target_t *tr = transcoder_create(gh, 
 					     480, 
 					     384,
-					     SCT_MPEG2VIDEO,
-					     SCT_MP3);
+					     SCT_VP8,
+					     SCT_VORBIS);
   tsfix = tsfix_create(tr);
 #else
   gh = globalheaders_create(&sq.sq_st);

@@ -37,8 +37,13 @@ typedef struct transcoder_stream {
   AVFrame           *dec_frame; // decoding buffer for video stream
   AVFrame           *enc_frame; // encoding buffer for video stream
 
-  short           *dec_sample; // decoding buffer for audio stream
-  uint8_t         *enc_sample; // encoding buffer for audio stream
+  uint8_t           *dec_sample; // decoding buffer for audio stream
+  uint32_t           dec_size;
+  uint32_t           dec_offset;
+
+  uint8_t           *enc_sample; // encoding buffer for audio stream
+  uint32_t           enc_size;
+  uint32_t           enc_offset;
 } transcoder_stream_t;
 
 
@@ -65,18 +70,26 @@ typedef struct transcoder {
 static void
 transcoder_stream_create(transcoder_stream_t *ts, streaming_component_type_t type)
 {
+  memset(ts, 0, sizeof(transcoder_stream_t));
+
   ts->ttype = type;
   ts->sctx = avcodec_alloc_context();
   ts->tctx = avcodec_alloc_context();
-  ts->dec_frame = avcodec_alloc_frame();
-  ts->dec_sample = av_malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE*2 + FF_INPUT_BUFFER_PADDING_SIZE);
-  ts->enc_frame = avcodec_alloc_frame();
-  ts->enc_sample = av_malloc(AVCODEC_MAX_AUDIO_FRAME_SIZE*2 + FF_INPUT_BUFFER_PADDING_SIZE);
 
-  avcodec_get_frame_defaults(ts->dec_frame);
-  avcodec_get_frame_defaults(ts->enc_frame);
-  memset(ts->dec_sample, 0, AVCODEC_MAX_AUDIO_FRAME_SIZE*2 + FF_INPUT_BUFFER_PADDING_SIZE);
-  memset(ts->enc_sample, 0, AVCODEC_MAX_AUDIO_FRAME_SIZE*2 + FF_INPUT_BUFFER_PADDING_SIZE);
+  if(SCT_ISVIDEO(type)) {
+    ts->dec_frame = avcodec_alloc_frame();
+    ts->enc_frame = avcodec_alloc_frame();
+    avcodec_get_frame_defaults(ts->dec_frame);
+    avcodec_get_frame_defaults(ts->enc_frame);
+  } else if(SCT_ISAUDIO(type)) {
+    ts->dec_size = AVCODEC_MAX_AUDIO_FRAME_SIZE*2;
+    ts->dec_sample = av_malloc(ts->dec_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    memset(ts->dec_sample, 0, ts->dec_size + FF_INPUT_BUFFER_PADDING_SIZE);
+
+    ts->enc_size = AVCODEC_MAX_AUDIO_FRAME_SIZE*2;
+    ts->enc_sample = av_malloc(ts->enc_size + FF_INPUT_BUFFER_PADDING_SIZE);
+    memset(ts->enc_sample, 0, ts->enc_size + FF_INPUT_BUFFER_PADDING_SIZE);
+  }
 }
 
 
@@ -88,11 +101,18 @@ transcoder_stream_destroy(transcoder_stream_t *ts)
 {
   av_free(ts->sctx);
   av_free(ts->tctx);
-  av_free(ts->dec_frame);
-  av_free(ts->enc_frame);
-  av_free(ts->dec_sample);
-  av_free(ts->enc_sample);
-  sws_freeContext(ts->scaler);
+
+  if(ts->dec_frame)
+    av_free(ts->dec_frame);
+  if(ts->enc_frame)
+    av_free(ts->enc_frame);
+  if(ts->scaler)
+    sws_freeContext(ts->scaler);
+
+  if(ts->dec_sample)
+    av_free(ts->dec_sample);
+  if(ts->enc_sample)
+    av_free(ts->enc_sample);
 }
 
 
@@ -104,7 +124,8 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
 {
   th_pkt_t *n = NULL;
   AVPacket packet;
-  int length, len;
+  int length, len, i;
+  uint32_t frame_bytes; 
 
   av_init_packet(&packet);
   packet.data = pktbuf_ptr(pkt->pkt_payload);
@@ -113,20 +134,19 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
   packet.dts  = pkt->pkt_dts;
   packet.duration = pkt->pkt_duration;
 
-  len = AVCODEC_MAX_AUDIO_FRAME_SIZE*2;
-  length = avcodec_decode_audio3(ts->sctx, ts->dec_sample, &len, &packet);
+  len = ts->dec_size - ts->dec_offset;
+  length = avcodec_decode_audio3(ts->sctx, (short*)(ts->dec_sample + ts->dec_offset), &len, &packet);
   if(length <= 0) {
     tvhlog(LOG_ERR, "transcode", "Unable to decode audio (%d)", length);
     goto cleanup;
   }
+  ts->dec_offset += len;
 
   ts->tctx->channels        = ts->sctx->channels > 1 ? 2 : 1;
   ts->tctx->channel_layout  = ts->tctx->channels > 1 ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
   ts->tctx->bit_rate        = ts->tctx->channels * 64000;
   ts->tctx->sample_rate     = ts->sctx->sample_rate;
   ts->tctx->sample_fmt      = ts->sctx->sample_fmt;
-  //ts->tctx->frame_size      = ts->sctx->frame_size;
-  //ts->tctx->block_align     = ts->sctx->block_align;
   ts->tctx->time_base.den   = ts->tctx->sample_rate;
   ts->tctx->time_base.num   = 1;
 
@@ -154,6 +174,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->codec_id = CODEC_ID_NONE;
       break;
     }
+
     AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
     if(!codec || avcodec_open(ts->tctx, codec) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find audio encoder");
@@ -161,25 +182,43 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     }
   }
 
-  length = avcodec_encode_audio(ts->tctx, ts->enc_sample, AVCODEC_MAX_AUDIO_FRAME_SIZE*2, ts->dec_sample);
-  if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to encode audio (%d)", length);
-    goto cleanup;
+  frame_bytes = ts->tctx->frame_size;
+  frame_bytes *= ts->tctx->channels;
+  frame_bytes *= av_get_bytes_per_sample(ts->tctx->sample_fmt);
+
+  len = ts->dec_offset;
+  ts->enc_offset = 0;
+  
+  for(i=0; i<=len-frame_bytes; i+=frame_bytes) {
+    length = avcodec_encode_audio(ts->tctx, ts->enc_sample + ts->enc_offset, ts->enc_size - ts->enc_offset, (short *)(ts->dec_sample + i));
+    if(length < 0) {
+      tvhlog(LOG_ERR, "transcode", "Unable to encode audio (%d)", length);
+      goto cleanup;
+    }
+
+    ts->enc_offset += length;
+    ts->dec_offset -= frame_bytes;
   }
 
-  n = pkt_alloc(ts->enc_sample, length, pkt->pkt_pts, pkt->pkt_dts);
-  n->pkt_duration = pkt->pkt_duration;
-  n->pkt_commercial = pkt->pkt_commercial;
-  n->pkt_componentindex = pkt->pkt_componentindex;
-  n->pkt_frametype = pkt->pkt_frametype;
-  n->pkt_field = pkt->pkt_field;
-  n->pkt_channels = ts->tctx->channels;
-  n->pkt_sri = pkt->pkt_sri;
-  n->pkt_aspect_num = pkt->pkt_aspect_num;
-  n->pkt_aspect_den = pkt->pkt_aspect_den;
+  if(ts->dec_offset) {
+    memmove(ts->dec_sample, ts->dec_sample + len - ts->dec_offset, ts->dec_offset);
+  }
 
-  if(ts->tctx->extradata_size) {
-    n->pkt_header = pktbuf_alloc(ts->tctx->extradata, ts->tctx->extradata_size);
+  if(ts->enc_offset) {
+    n = pkt_alloc(ts->enc_sample, ts->enc_offset, pkt->pkt_pts, pkt->pkt_dts);
+    n->pkt_duration = pkt->pkt_duration;
+    n->pkt_commercial = pkt->pkt_commercial;
+    n->pkt_componentindex = pkt->pkt_componentindex;
+    n->pkt_frametype = pkt->pkt_frametype;
+    n->pkt_field = pkt->pkt_field;
+    n->pkt_channels = ts->tctx->channels;
+    n->pkt_sri = pkt->pkt_sri;
+    n->pkt_aspect_num = pkt->pkt_aspect_num;
+    n->pkt_aspect_den = pkt->pkt_aspect_den;
+
+    if(ts->tctx->extradata_size) {
+      n->pkt_header = pktbuf_alloc(ts->tctx->extradata, ts->tctx->extradata_size);
+    }
   }
 
  cleanup:
