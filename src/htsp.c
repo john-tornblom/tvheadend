@@ -40,6 +40,7 @@
 #include "psi.h"
 #include "htsmsg_binary.h"
 #include "plumbing/transcode.h"
+#include "plumbing/tsfix.h"
 
 #include <sys/statvfs.h>
 #include "settings.h"
@@ -159,6 +160,7 @@ typedef struct htsp_subscription {
 
 #ifdef CONFIG_TRANSCODER
   streaming_target_t *hs_transcoder;
+  streaming_target_t *hs_tsfix;
 #endif
 
   htsp_msg_q_t hs_q;
@@ -244,6 +246,8 @@ htsp_subscription_destroy(htsp_connection_t *htsp, htsp_subscription_t *hs)
 #ifdef CONFIG_TRANSCODER
   if(hs->hs_transcoder != NULL)
     transcoder_destroy(hs->hs_transcoder);
+  if(hs->hs_tsfix != NULL)
+    tsfix_destroy(hs->hs_tsfix);
 #endif
   htsp_flush_queue(htsp, &hs->hs_q);
   free(hs);
@@ -926,11 +930,12 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 					  max_height,
 					  SCT_MPEG2VIDEO,
 					  SCT_MPEG2AUDIO);
+    hs->hs_tsfix = tsfix_create(hs->hs_transcoder);
   }
   hs->hs_s =
     subscription_create_from_channel(ch, weight,
 				     htsp->htsp_logname,
-				     hs->hs_transcoder ?: &hs->hs_input, 0);
+				     hs->hs_tsfix ?: &hs->hs_input, 0);
 #else
   hs->hs_s =
     subscription_create_from_channel(ch, weight,
