@@ -187,15 +187,18 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     }
   }
 
-  frame_bytes = ts->tctx->frame_size;
-  frame_bytes *= ts->tctx->channels;
-  frame_bytes *= av_get_bytes_per_sample(ts->tctx->sample_fmt);
+  frame_bytes = av_get_bytes_per_sample(ts->tctx->sample_fmt) * 
+	ts->tctx->frame_size *
+	ts->tctx->channels;
 
   len = ts->dec_offset;
   ts->enc_offset = 0;
   
   for(i=0; i<=len-frame_bytes; i+=frame_bytes) {
-    length = avcodec_encode_audio(ts->tctx, ts->enc_sample + ts->enc_offset, ts->enc_size - ts->enc_offset, (short *)(ts->dec_sample + i));
+    length = avcodec_encode_audio(ts->tctx, 
+				  ts->enc_sample + ts->enc_offset, 
+				  ts->enc_size - ts->enc_offset, 
+				  (short *)(ts->dec_sample + i));
     if(length < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to encode audio (%d)", length);
       goto cleanup;
