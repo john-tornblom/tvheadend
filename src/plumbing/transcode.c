@@ -293,7 +293,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->max_b_frames          = 1;
       ts->tctx->qmin                  = 1;
       ts->tctx->qmax                  = 63;
-      ts->tctx->bit_rate              = 750 * 1000;
+      ts->tctx->bit_rate              = 250 * 1000;
       ts->tctx->rc_min_rate           = ts->tctx->bit_rate;
       ts->tctx->rc_max_rate           = ts->tctx->bit_rate;
       break;
