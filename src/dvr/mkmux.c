@@ -73,7 +73,7 @@ struct mk_mux {
 
   mk_track *tracks;
   int ntracks;
-
+  int has_video;
   int64_t totduration;
 
   htsbuf_queue_t *cluster;
@@ -208,7 +208,8 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
 
   mkm->tracks = calloc(1, sizeof(mk_track) * ss->ss_num_components);
   mkm->ntracks = ss->ss_num_components;
-  
+  mkm->has_video = 0;
+
   for(i = 0; i < ss->ss_num_components; i++) {
     ssc = &ss->ss_components[i];
 
@@ -285,6 +286,7 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
     mkm->tracks[i].enabled = 1;
     tracknum++;
     mkm->tracks[i].tracknum = tracknum;
+    mkm->has_video |= (tracktype == 1);
 
     t = htsbuf_queue_alloc(0);
 
@@ -870,6 +872,8 @@ mk_write_frame_i(mk_mux_t *mkm, mk_track *t, th_pkt_t *pkt)
     mk_close_cluster(mkm);
 
   else if(mkm->cluster && mkm->cluster->hq_size > clusersizemax)
+    mk_close_cluster(mkm);
+  else if(!mkm->has_video)
     mk_close_cluster(mkm);
 
   if(mkm->cluster == NULL) {
