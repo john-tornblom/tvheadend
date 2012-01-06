@@ -174,6 +174,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     case SCT_VORBIS:
       ts->tctx->codec_id = CODEC_ID_VORBIS;
       ts->tctx->flags   |= CODEC_FLAG_QSCALE;
+      ts->tctx->global_quality = 4*FF_QP2LAMBDA;
       break;
     default:
       ts->tctx->codec_id = CODEC_ID_NONE;
