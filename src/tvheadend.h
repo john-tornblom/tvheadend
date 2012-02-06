@@ -165,14 +165,16 @@ typedef enum {
   SCT_EAC3,
   SCT_MP3,
   SCT_VP8,
-  SCT_VORBIS
+  SCT_VORBIS,
+  SCT_MP4A,
 } streaming_component_type_t;
 
 #define SCT_ISVIDEO(t) ((t) == SCT_MPEG2VIDEO || (t) == SCT_H264 || \
 			(t) == SCT_VP8)
 #define SCT_ISAUDIO(t) ((t) == SCT_MPEG2AUDIO || (t) == SCT_AC3 || \
 			(t) == SCT_EAC3       || (t) == SCT_AAC || \
-			(t) == SCT_VORBIS     || (t) == SCT_MP3)
+			(t) == SCT_VORBIS     || (t) == SCT_MP3 || \
+			(t) == SCT_MP4A)
 
 /**
  * The signal status of a tuner
