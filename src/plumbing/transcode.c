@@ -268,8 +268,9 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     goto cleanup;
   }
 
-  ts->tctx->sample_aspect_ratio.num = pkt->pkt_aspect_num;
-  ts->tctx->sample_aspect_ratio.den = pkt->pkt_aspect_den;
+
+  ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
+  ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
 
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
       ts->tctx->time_base.den = 25;
