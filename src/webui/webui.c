@@ -390,7 +390,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 					     480, 
 					     384,
 					     SCT_VP8,
-					     SCT_VORBIS);
+					     SCT_MP3);
   tsfix = tsfix_create(tr);
 #else
   gh = globalheaders_create(&sq.sq_st);
