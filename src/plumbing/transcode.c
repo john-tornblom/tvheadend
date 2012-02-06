@@ -160,6 +160,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     case SCT_MP3:
       ts->tctx->codec_id = CODEC_ID_MP3;
       ts->tctx->flags   |= CODEC_FLAG_QSCALE;
+      ts->tctx->global_quality = 4*FF_QP2LAMBDA;
       break;
     case SCT_MPEG2AUDIO:
       ts->tctx->codec_id = CODEC_ID_MP2;
@@ -167,6 +168,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     case SCT_AAC:
       ts->tctx->codec_id = CODEC_ID_AAC;
       ts->tctx->flags   |= CODEC_FLAG_QSCALE;
+      ts->tctx->global_quality = 4*FF_QP2LAMBDA;
       break;
     case SCT_AC3:
       ts->tctx->codec_id = CODEC_ID_AC3;
