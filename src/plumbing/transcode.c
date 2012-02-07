@@ -270,9 +270,10 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     goto cleanup;
   }
 
-
-  ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
-  ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
+  ts->tctx->sample_aspect_ratio.num = ts->sctx->sample_aspect_ratio.num;
+  ts->tctx->sample_aspect_ratio.den = ts->sctx->sample_aspect_ratio.den;
+  //ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
+  //ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
 
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
       ts->tctx->time_base.den = 25;
@@ -327,7 +328,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->weighted_p_pred       = 2; // wpredp=2
 
       ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
-      ts->tctx->dsp_mask              = (FF_MM_MMX | FF_MM_MMXEXT | FF_MM_SSE);
+      ts->tctx->dsp_mask              = (AV_CPU_FLAG_MMX | AV_CPU_FLAG_MMX2 | AV_CPU_FLAG_SSE);
       ts->tctx->rc_lookahead          = 0;
       ts->tctx->max_b_frames          = 0;
       ts->tctx->b_frame_strategy      = 1;
