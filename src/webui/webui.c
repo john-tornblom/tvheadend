@@ -133,7 +133,6 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
 {
   streaming_message_t *sm;
   int run = 1;
-  int start = 1;
   int timeouts = 0;
   mk_mux_t *mkm = NULL;
 
@@ -180,7 +179,6 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
       break;
 
     case SMT_START: {
-      start = 0;
       http_output_content(hc, "video/x-matroska");
 
       event_t *e = epg_event_find_by_time(s->ths_channel, dispatch_clock);
@@ -255,7 +253,6 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
   dvr_entry_t *de = NULL;
   time_t durration = 0;
   off_t fsize = 0;
-  int bandwidth = 0;
   const char *host = http_arg_get(&hc->hc_args, "Host");
 
   pthread_mutex_lock(&global_lock);
@@ -269,14 +266,8 @@ http_dvr_playlist(http_connection_t *hc, int dvr_id)
     fsize = dvr_get_filesize(de);
 
     if(fsize) {
-      bandwidth = ((8*fsize) / (durration*1024.0));
-
       htsbuf_qprintf(hq, "#EXTM3U\n");
       htsbuf_qprintf(hq, "#EXTINF:%d,%s\n", durration, de->de_title);
-
-      //Only for apple products?
-      //htsbuf_qprintf(hq, "#EXT-X-TARGETDURATION:%d\n", durration);
-      //htsbuf_qprintf(hq, "#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=%d\n", bandwidth);
 
       snprintf(buf, sizeof(buf), "/dvrfile/%d", dvr_id);
       ticket_id = access_ticket_create(buf, durration+5);
