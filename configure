@@ -162,6 +162,7 @@ if enabled transcoder; then
 	echo "Using libavcodec:      `pkg-config --modversion libavcodec`"
     else
 	echo "libavcodec 52.96.0 or newer not found."
+	echo "To compile without it, configure with: --disable-transcoder"
 	die
     fi
 
@@ -171,6 +172,7 @@ if enabled transcoder; then
 	echo "Using libavutil:       `pkg-config --modversion libavutil`"
     else
 	echo "libavutil 50.43.0 or newer not found."
+	echo "To compile without it, configure with: --disable-transcoder"
 	die
     fi
 
@@ -180,6 +182,7 @@ if enabled transcoder; then
 	echo "Using libswscale:      `pkg-config --modversion libswscale`"
     else
 	echo "libswscale 0.13.0 or newer not found."
+	echo "To compile without it, configure with: --disable-transcoder"
 	die
     fi
 fi

@@ -28,190 +28,124 @@ tvheadend.help = function(title, pagename) {
 }
 
 /**
- * Displays a mediaplayer using VLC plugin
+ * Displays a mediaplayer for HTML5 video tag
  */
-tvheadend.VLC = function(url) {
- 
-  function randomString() {
-	var chars = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz";
-	var string_length = 8;
-	var randomstring = '';
-	for (var i=0; i<string_length; i++) {
-		var rnum = Math.floor(Math.random() * chars.length);
-		randomstring += chars.substring(rnum,rnum+1);
-	}
-	return randomstring;
-  }
-  var vlc = document.createElement('embed');
-  vlc.setAttribute('type', 'application/x-vlc-plugin');
-  vlc.setAttribute('pluginspage', 'http://www.videolan.org');
-  vlc.setAttribute('version', 'VideoLAN.VLCPlugin.2');
-  vlc.setAttribute('width', '100%');
-  vlc.setAttribute('height', '100%');
-  vlc.setAttribute('autoplay', 'no');
-  vlc.setAttribute('id', randomString());
-  
-  var missingPlugin = document.createElement('div');
-  missingPlugin.style.display = 'none';
-  missingPlugin.style.padding = '5px';
-  
-  var selectChannel = new Ext.form.ComboBox({
-    loadingText: 'Loading...',
-    width: 200,
-    displayField:'name',
-    store: tvheadend.channels,
-    mode: 'local',
-    editable: false,
-    triggerAction: 'all',
-    emptyText: 'Select channel...'
-  });
-  
-  selectChannel.on('select', function(c, r) {
-      var streamurl = 'stream/channelid/' + r.data.chid;
-      var playlisturl = 'playlist/channelid/' + r.data.chid;
-
-      // if the player was initialised, but not yet shown, make it visible
-      if (vlc.playlist && (vlc.style.display == 'none'))
-	vlc.style.display = 'block';
-
-      if(!vlc.playlist || vlc.playlist == 'undefined') {
-	 missingPlugin.innerHTML  = '<p>Embedded player could not be started. <br> You are probably missing VLC Mozilla plugin for your browser.</p>';
-	 missingPlugin.innerHTML += '<p><a href="' + playlisturl + '">M3U Playlist</a></p>';
-	 missingPlugin.innerHTML += '<p><a href="' + streamurl + '">Direct URL</a></p>';
-      }
-      else {
-        vlc.playlist.stop();
-   	 vlc.playlist.items.clear();
-   	 vlc.playlist.add(streamurl);
-    	 vlc.playlist.playItem(0);
-     	 vlc.audio.volume = slider.getValue();
-	}
+tvheadend.MediaPlayer = function(url) {
+    var video = document.createElement('video');
+    video.setAttribute('autoplay', 'autoplay');
+    video.setAttribute('preload', 'none');
+    if(url) {
+	video.setAttribute('src', url);
     }
-  );
-  
-  var slider = new Ext.Slider({
-    width: 135,
-    height: 20,
-    value: 90,
-    increment: 1,
-    minValue: 0,
-    maxValue: 100
-  });
-  
-  var sliderLabel = new Ext.form.Label();
-  sliderLabel.setText("90%");
-  slider.addListener('change', function() {
-    if(vlc.playlist && vlc.playlist.isPlaying) {
-      vlc.audio.volume = slider.getValue();
-      sliderLabel.setText(vlc.audio.volume + '%');
-    } else {
-      sliderLabel.setText(slider.getValue() + '%');
-    }
-  });
-  
-  var win = new Ext.Window({
-    title: 'VLC Player',
-    layout:'fit',
-    width: 507 + 14,
-    height: 384 + 56,
-    constrainHeader: true,
-    iconCls: 'eye',
-    resizable: true,
-    tbar: [
-      selectChannel,
-      '-',
-      {
-        iconCls: 'control_play',
-        tooltip: 'Play',
-        handler: function() {
-          if(vlc.playlist && vlc.playlist.items.count && !vlc.playlist.isPlaying) {
-            vlc.playlist.play();
-          }
-        }
-      },
-      {
-        iconCls: 'control_pause',
-        tooltip: 'Pause',
-        handler: function() {
-          if(vlc.playlist && vlc.playlist.items.count) {
-            vlc.playlist.togglePause();
-          }
-        }
-      },
-      {
-        iconCls: 'control_stop',
-        tooltip: 'Stop',
-        handler: function() {
-          if(vlc.playlist) {
-            vlc.playlist.stop();
-          }
-        }
-      },
-      '-',
-      {
-        iconCls: 'control_fullscreen',
-        tooltip: 'Fullscreen',
-        handler: function() {
-          if(vlc.playlist && vlc.playlist.isPlaying && (vlc.VersionInfo.substr(0,3) != '1.1')) {
-            vlc.video.toggleFullscreen();
-          }
-	   else if (vlc.VersionInfo.substr(0,3) == '1.1') {
-            alert('Fullscreen mode is broken in VLC 1.1.x');
-          }
-        }
-      },
-      '-',
-      {
-        iconCls: 'control_volume',
-        tooltip: 'Volume',
-        disabled: true
-      },
-    ],
-    items: [vlc, missingPlugin]
-  });
-	  
-  win.on('beforeShow', function() {
-    win.getTopToolbar().add(slider);
-    win.getTopToolbar().add(new Ext.Toolbar.Spacer());
-    win.getTopToolbar().add(new Ext.Toolbar.Spacer());
-    win.getTopToolbar().add(new Ext.Toolbar.Spacer());
-    win.getTopToolbar().add(sliderLabel);
 
-    // check if vlc plugin wasn't initialised correctly
-    if(!vlc.playlist || (vlc.playlist == 'undefined')) {
-      vlc.style.display = 'none';
-      
-      missingPlugin.innerHTML  = '<p>Embedded player could not be started. <br> You are probably missing VLC Mozilla plugin for your browser.</p>';
-      
-      if (url) {
-        var channelid = url.substr(url.lastIndexOf('/'));
-        var streamurl = 'stream/channelid/' + channelid;
-        var playlisturl = 'playlist/channelid/' + channelid;
-        missingPlugin.innerHTML += '<p><a href="' + playlisturl + '">M3U Playlist</a></p>';
-        missingPlugin.innerHTML += '<p><a href="' + streamurl + '">Direct URL</a></p>';
-      }
+    var selectChannel = new Ext.form.ComboBox({
+	loadingText: 'Loading...',
+	width: 200,
+	displayField:'name',
+	store: tvheadend.channels,
+	mode: 'local',
+	editable: false,
+	triggerAction: 'all',
+	emptyText: 'Select channel...'
+    });
+  
+    selectChannel.on('select', function(c, r) {
+	video.src = 'stream/channelid/' + r.data.chid;
+    });
+    
+    var slider = new Ext.Slider({
+	width: 135,
+	height: 20,
+	value: 90,
+	increment: 1,
+	minValue: 0,
+	maxValue: 99
+    });
+  
+    var sliderLabel = new Ext.form.Label();
+    sliderLabel.setText("90%");
 
-      missingPlugin.style.display = 'block';
-    }
-    else {
-	// check if the window was opened with an url-parameter
-	if (url) {
-	  vlc.playlist.items.clear();
-	  vlc.playlist.add(url);
-	  vlc.playlist.playItem(0);
-	  
-	  //enable yadif2x deinterlacer for vlc > 1.1
-	  var point1 = vlc.VersionInfo.indexOf('.');
-	  var point2 = vlc.VersionInfo.indexOf('.', point1+1);
-	  var majVersion = vlc.VersionInfo.substring(0,point1);
-	  var minVersion = vlc.VersionInfo.substring(point1+1,point2);
-	  if ((majVersion >= 1) && (minVersion >= 1))
-	    vlc.video.deinterlace.enable("yadif2x");	  
-	}
-    }
-  });
+    slider.addListener('change', function() {
+	video.volume = slider.getValue()/100.0;
+	sliderLabel.setText(slider.getValue() + '%');
+    });
+  
+    var win = new Ext.Window({
+	title: 'Media Player',
+	layout:'fit',
+	width: 507 + 14,
+	height: 384 + 56,
+	constrainHeader: true,
+	iconCls: 'eye',
+	resizable: true,
+	items: [video],
+	tbar: [
+	    selectChannel,
+	    '-',
+	    {
+		iconCls: 'control_play',
+		tooltip: 'Play',
+		handler: function() {
+		    video.play();
+		}
+	    },
+	    {
+		iconCls: 'control_pause',
+		tooltip: 'Pause',
+		handler: function() {
+		    video.pause();
+		}
+	    },
+	    {
+		iconCls: 'control_stop',
+		tooltip: 'Stop',
+		handler: function() {
+		    video.src = 'docresources/tvheadendlogo.png';
+		}
+            },
+	    '-',
+	    {
+		iconCls: 'control_fullscreen',
+		tooltip: 'Fullscreen',
+		handler: function() {
+		    if(video.requestFullScreen){
+			video.requestFullScreen();
+		    } else if(video.mozRequestFullScreen){
+			video.mozRequestFullScreen();
+		    } else if(video.webkitRequestFullScreen){
+			video.webkitRequestFullScreen();
+		    }
+		}
+	    },
+	    '-',
+	    {
+		iconCls: 'control_volume',
+		tooltip: 'Volume',
+		disabled: true
+	    },
+	]
+    });    
 
-  win.show();
+    win.on('beforeShow', function() {
+	win.getTopToolbar().add(slider);
+	win.getTopToolbar().add(new Ext.Toolbar.Spacer());
+	win.getTopToolbar().add(new Ext.Toolbar.Spacer());
+	win.getTopToolbar().add(new Ext.Toolbar.Spacer());
+	win.getTopToolbar().add(sliderLabel);
+	video.width = win.getInnerWidth();
+	video.height = win.getInnerHeight();
+    });
+
+    win.on('bodyresize', function() {
+	video.width = win.getInnerWidth();
+	video.height = win.getInnerHeight();
+    });
+
+    win.on('close', function() {
+	video.pause();
+	video.src = 'docresources/tvheadendlogo.png';
+    });
+    win.show();
 };
 
 /**

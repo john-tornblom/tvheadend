@@ -43,6 +43,7 @@
 
 struct filebundle *filebundles;
 
+#define ATOI(x, y) x ? atoi(x) : y;
 /**
  *
  */
@@ -129,7 +130,7 @@ page_static_file(http_connection_t *hc, const char *remain, void *opaque)
  * HTTP stream loop
  */
 static void
-http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t *s)
+http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t *s, int webm)
 {
   streaming_message_t *sm;
   int run = 1;
@@ -179,13 +180,18 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
       break;
 
     case SMT_START: {
-      if(s->ths_service->s_servicetype == ST_RADIO)
+      if(webm && s->ths_service->s_servicetype == ST_RADIO)
 	http_output_content(hc, "audio/webm");
-      else
+      else if(webm && s->ths_service->s_servicetype != ST_RADIO)
 	http_output_content(hc, "video/webm");
+      else if(!webm && s->ths_service->s_servicetype == ST_RADIO)
+	http_output_content(hc, "audio/x-matroska");
+      else
+	http_output_content(hc, "video/x-matroska");
 
       event_t *e = epg_event_find_by_time(s->ths_channel, dispatch_clock);
-      mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data, e);
+
+      mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data, e, webm);
       break;
     }
     case SMT_STOP:
@@ -356,10 +362,7 @@ http_stream_service(http_connection_t *hc, service_t *service)
 
   pthread_mutex_unlock(&global_lock);
 
-  //We won't get a START command, send http-header here.
-  http_output_content(hc, "video/mp2t");
-
-  http_stream_run(hc, &sq, s);
+  http_stream_run(hc, &sq, s, 0);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -378,21 +381,35 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   streaming_queue_t sq;
   th_subscription_t *s;
   streaming_target_t *gh, *tsfix;
-  int priority = 150; //Default value, Compute this somehow
+  int priority = 100;
+  int webm = 0;
 
   streaming_queue_init(&sq, 0);
   gh = globalheaders_create(&sq.sq_st);
-#ifdef CONFIG_TRANSCODER
-  streaming_target_t *tr = transcoder_create(gh, 
-					     480, 
-					     384,
-					     SCT_VP8,
-					     SCT_MP3);
-  tsfix = tsfix_create(tr);
-#else
-  gh = globalheaders_create(&sq.sq_st);
-  tsfix = tsfix_create(gh);
+
+#if CONFIG_TRANSCODER
+  streaming_target_t *tr = NULL;
+  webm = ATOI(http_arg_get(&hc->hc_req_args, "t"), 0);
+  int width = ATOI(http_arg_get(&hc->hc_req_args, "w"), 480);
+  int height = ATOI(http_arg_get(&hc->hc_req_args, "h"), 384);
+
+  width = MIN(width, 576);
+  height = MIN(height, 480);
+
+  width = MAX(width, 144);
+  height = MAX(height, 120);
+
+  if(webm)
+    tr = transcoder_create(gh, 
+			   width, 
+			   height,
+			   SCT_VP8,
+			   SCT_VORBIS);
+  if(tr)
+    tsfix = tsfix_create(tr);
+  else
 #endif
+    tsfix = tsfix_create(gh);
 
   pthread_mutex_lock(&global_lock);
   s = subscription_create_from_channel(ch, priority, 
@@ -400,7 +417,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
                                        0);
   pthread_mutex_unlock(&global_lock);
 
-  http_stream_run(hc, &sq, s);
+  http_stream_run(hc, &sq, s, webm);
 
   pthread_mutex_lock(&global_lock);
   subscription_unsubscribe(s);
@@ -408,7 +425,8 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 
   globalheaders_destroy(gh);
 #ifdef CONFIG_TRANSCODER
-  transcoder_destroy(tr);
+  if(tr)
+    transcoder_destroy(tr);
 #endif
   tsfix_destroy(tsfix);
   streaming_queue_deinit(&sq);
