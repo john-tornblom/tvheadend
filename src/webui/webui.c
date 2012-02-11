@@ -209,6 +209,9 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
     streaming_msg_free(sm);
     pthread_mutex_unlock(&sq->sq_mutex);
   }
+
+  if(mkm)
+    mk_mux_close(mkm);
 }
 
 /**
