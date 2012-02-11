@@ -50,7 +50,7 @@ tvheadend.MediaPlayer = function(url) {
     });
   
     selectChannel.on('select', function(c, r) {
-	video.src = 'stream/channelid/' + r.data.chid;
+	video.src = 'stream/channelid/' + r.data.chid + '?t=1';
     });
     
     var slider = new Ext.Slider({
