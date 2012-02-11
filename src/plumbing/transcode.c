@@ -293,7 +293,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     case SCT_VP8:
       ts->tctx->codec_id              = CODEC_ID_VP8;
       ts->tctx->pix_fmt               = PIX_FMT_YUV420P;
-      ts->tctx->flags                |= CODEC_FLAG_QSCALE;
+      //ts->tctx->flags                |= CODEC_FLAG_QSCALE;
       ts->tctx->rc_lookahead          = 1;
       ts->tctx->max_b_frames          = 1;
       ts->tctx->qmin                  = 1;
