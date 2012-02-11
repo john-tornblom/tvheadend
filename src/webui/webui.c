@@ -404,7 +404,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 			   width, 
 			   height,
 			   SCT_VP8,
-			   SCT_VORBIS);
+			   SCT_MP3);
   if(tr)
     tsfix = tsfix_create(tr);
   else
