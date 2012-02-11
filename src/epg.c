@@ -572,13 +572,42 @@ epg_content_group_get_name(uint8_t id)
 uint8_t
 epg_content_group_find_by_name(const char *name)
 {
-  int i;
-  
-  for(i = 0; i < 16; i++) {
-    if(groupnames[i] != NULL && !strcmp(name, groupnames[i]))
-      return i;
-  }
-  return 0;
+if (!strcmp(name,"Drama") || !strcmp(name,"Film") || !strcmp(name,"Movie") || !strcmp(name,"Comedy drama") || !strcmp(name,"Sitcom") || !strcmp(name,"Comedy")){
+    return 1;
+}
+else if (!strcmp(name,"News") || !strcmp(name,"Current affairs") || !strcmp(name,"News and current affairs")){
+    return 2;
+}
+else if (!strcmp(name,"Game show") || !strcmp(name,"Talk show") ){
+    return 3;
+}
+else if (!strcmp(name,"Sport")){
+    return 4;
+}
+else if (!strcmp(name,"Children") || !strcmp(name,"Animation")){
+    return 5;
+}
+else if (!strcmp(name,"Music") || !strcmp(name,"Music and Arts") ){
+    return 6;
+}
+else if (!strcmp(name,"Arts and culture")){
+    return 7;
+}
+else if (!strcmp(name,"Discussion/Debate") || !strcmp(name,"Reality") || !strcmp(name,"Soap") ){
+    return 8;
+} 
+else if (!strcmp(name,"Education") || !strcmp(name,"Sci-fi") || !strcmp(name,"Drama documentary") || !strcmp(name,"Documentary") || !strcmp(name,"Factual") || !strcmp(name,"Science") || !strcmp(name,"Religion") ){
+    return 9;
+}
+else if (!strcmp(name,"Gardening") || !strcmp(name,"Transport") || !strcmp(name,"Cookery") || !strcmp(name,"Nature") || !strcmp(name,"Health") || !strcmp(name,"Home and property") || !strcmp(name,"Travel") || !strcmp(name,"Consumer") || !strcmp(name,"Motoring") || !strcmp(name,"Food") ){
+    return 10;
+}
+else if (!strcmp(name,"Special characteristics") || !strcmp(name,"Interests")){
+    return 11;
+}
+else{
+    return 0;
+}
 }
 
 
