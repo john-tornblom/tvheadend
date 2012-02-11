@@ -301,6 +301,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->bit_rate              = 250 * 1000;
       ts->tctx->rc_min_rate           = ts->tctx->bit_rate;
       ts->tctx->rc_max_rate           = ts->tctx->bit_rate;
+      ts->enc_frame->quality          = 20;
       break;
     case SCT_H264:
       ts->tctx->codec_id              = CODEC_ID_H264;
