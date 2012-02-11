@@ -179,7 +179,10 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
       break;
 
     case SMT_START: {
-      http_output_content(hc, "video/x-matroska");
+      if(s->ths_service->s_servicetype == ST_RADIO)
+	http_output_content(hc, "audio/webm");
+      else
+	http_output_content(hc, "video/webm");
 
       event_t *e = epg_event_find_by_time(s->ths_channel, dispatch_clock);
       mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data, e);
