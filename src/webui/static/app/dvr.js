@@ -700,7 +700,19 @@ tvheadend.dvrsettings = function() {
 	reader: confreader,
 	defaultType: 'textfield',
 	layout: 'form',
-	items: [{
+    html:'<pre>\tSupported format strings:<br>' +
+        '\tFormat\tDescription\t\t\t\t\tExample value<br>' +
+        '\t%f\tFull path to recording\t\t\t\t/home/user/Videos/News.mkv<br>' +
+        '\t%b\tBasename of recording\t\t\t\tNews.mkv<br>' +
+        '\t%c\tChannel name\t\t\t\t\tBBC world<br>' +
+        '\t%C\tWho created this recording\t\t\tuser<br>' +
+        '\t%t\tProgram title\t\t\t\t\tNews<br>' +
+        '\t%d\tProgram description\t\t\t\tNews and stories...<br>' +
+        '\t%S\tStart time stamp of recording, UNIX epoch\t1224421200<br>' +
+        '\t%E\tStop time stamp of recording, UNIX epoch\t1224426600<br>' +
+        '\t%e\tError message\t\t\t\t\tAborted by user</pre>'
+        ,
+    items: [{
 	    width: 300,
 	    fieldLabel: 'Recording system path',
 	    name: 'storage'
