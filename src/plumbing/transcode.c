@@ -403,14 +403,12 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   
   n = pkt_alloc(out, length, ts->enc_frame->pts, pkt->pkt_dts);
 
-  if(ts->enc_frame->pict_type & FF_I_TYPE)
+  if(ts->enc_frame->pict_type == FF_I_TYPE)
     n->pkt_frametype = PKT_I_FRAME;
-  else if(ts->enc_frame->pict_type & FF_P_TYPE)
+  else if(ts->enc_frame->pict_type == FF_P_TYPE)
     n->pkt_frametype = PKT_P_FRAME;
-  else if(ts->enc_frame->pict_type & FF_B_TYPE)
+  else if(ts->enc_frame->pict_type == FF_B_TYPE)
     n->pkt_frametype = PKT_B_FRAME;
-  else
-    n->pkt_frametype = pkt->pkt_frametype;
 
   n->pkt_duration = pkt->pkt_duration;
 
