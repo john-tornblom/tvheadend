@@ -544,17 +544,17 @@ epg_unlink_from_channel(channel_t *ch)
  * Based on the content types defined in EN 300 468
  */
 static const char *groupnames[16] = {
-      [1] = "Movie / Drama",
-        [2] = "News / Current affairs",
-          [3] = "Show / Games",
-            [4] = "Sports",
-              [5] = "Children's / Youth",
-                [6] = "Music",
-                  [7] = "Art / Culture",
-                    [8] = "Social / Political issues / Economics",
-                      [9] = "Education / Science / Factual topics",
-                        [10] = "Leisure hobbies",
-                          [11] = "Special characteristics",
+   [1] = "Movie / Drama",
+   [2] = "News / Current affairs",
+   [3] = "Show / Games",
+   [4] = "Sports",
+   [5] = "Children's / Youth",
+   [6] = "Music",
+   [7] = "Art / Culture",
+   [8] = "Social / Political issues / Economics",
+   [9] = "Education / Science / Factual topics",
+   [10] = "Leisure hobbies",
+   [11] = "Special characteristics",
 };
 
 static const char *groupdefinition[0xFF] = {
