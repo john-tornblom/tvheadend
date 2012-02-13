@@ -543,7 +543,21 @@ epg_unlink_from_channel(channel_t *ch)
  *
  * Based on the content types defined in EN 300 468
  */
-static const char *groupnames[0xFF] = {
+static const char *groupnames[16] = {
+      [1] = "Movie / Drama",
+        [2] = "News / Current affairs",
+          [3] = "Show / Games",
+            [4] = "Sports",
+              [5] = "Children's / Youth",
+                [6] = "Music",
+                  [7] = "Art / Culture",
+                    [8] = "Social / Political issues / Economics",
+                      [9] = "Education / Science / Factual topics",
+                        [10] = "Leisure hobbies",
+                          [11] = "Special characteristics",
+};
+
+static const char *groupdefinition[0xFF] = {
     /* ox1Y are Movie/Drama */
     [0x10] = "Movie / Drama",
     [0x11] = "Detective / Thriller",
@@ -689,7 +703,7 @@ epg_content_group_find_by_name(const char *name)
 {
       unsigned int i;
       for(i = 0; i < 0xFF; i++) {
-         if(groupnames[i] != NULL && !strcasecmp(name, groupnames[i])){
+         if(groupdefinition[i] != NULL && !strcasecmp(name, groupdefinition[i])){
              int b = (i >> 4) & 0xF;
              return b;
          }
