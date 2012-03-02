@@ -97,7 +97,7 @@ access_ticket_create(const char *resource, int ttl)
   static const char hex_string[16] = "0123456789ABCDEF";
 
   //Min 5min tickets
-  if(!ttl)
+  if(ttl < 5)
     ttl = 5;
 
   //Max 24h tickets
