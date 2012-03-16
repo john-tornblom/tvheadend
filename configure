@@ -156,15 +156,16 @@ else
 fi
 
 if enabled transcoder; then
-    if pkg-config --atleast-version 52.96.0 libavcodec; then
-	echo >>${CONFIG_MAK} "LDFLAGS_cfg += " `pkg-config --libs libavcodec`
-	echo >>${CONFIG_MAK} "CFLAGS_cfg += " `pkg-config --cflags libavcodec`
-	echo "Using libavcodec:      `pkg-config --modversion libavcodec`"
-    else
-	echo "libavcodec 52.96.0 or newer not found."
-	echo "To compile without it, configure with: --disable-transcoder"
-	die
-    fi
+#    if pkg-config --atleast-version 52.96.0 libavcodec; then
+#	echo >>${CONFIG_MAK} "LDFLAGS_cfg += " `pkg-config --libs libavcodec`
+#	echo >>${CONFIG_MAK} "CFLAGS_cfg += " `pkg-config --cflags libavcodec`
+#	echo "Using libavcodec:      `pkg-config --modversion libavcodec`"
+ #   else
+#	echo "libavcodec 52.96.0 or newer not found."
+#	echo "To compile without it, configure with: --disable-transcoder"
+    echo "Ignore check for libavcodec"
+#	die
+ #   fi
 
     if pkg-config --atleast-version 50.43.0 libavutil; then
 	echo >>${CONFIG_MAK} "LDFLAGS_cfg += " `pkg-config --libs libavutil`

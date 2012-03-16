@@ -1055,7 +1055,7 @@ tvheadend.dvb_adapter_general = function(adapterData, satConfStore) {
     var confreader = new Ext.data.JsonReader({
 	root: 'dvbadapters'
     }, ['name', 'automux', 'idlescan', 'diseqcversion', 'qmon',
-	'dumpmux', 'nitoid']);
+	'dumpmux', 'nitoid','extrapriority']);
 
     
     function saveConfForm () {
@@ -1098,6 +1098,11 @@ tvheadend.dvb_adapter_general = function(adapterData, satConfStore) {
 	{
 	    fieldLabel: 'NIT-o Network ID',
 	    name: 'nitoid',
+	    width: 50
+	},
+	{
+	    fieldLabel: 'Extra priority',
+	    name: 'extrapriority',
 	    width: 50
 	}
     ];
