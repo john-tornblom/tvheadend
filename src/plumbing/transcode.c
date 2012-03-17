@@ -234,6 +234,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 {
   uint8_t *buf = NULL;
   uint8_t *out = NULL;
+  uint8_t *deint = NULL;
   th_pkt_t *n = NULL;
   AVPacket packet;
   int length, len;
@@ -346,6 +347,26 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     }
   }
 
+  AVPicture deint_pic;
+  len = avpicture_get_size(ts->sctx->pix_fmt, ts->sctx->width, ts->sctx->height);
+  deint = av_malloc(len);
+
+  avpicture_fill(&deint_pic,
+		 deint, 
+		 ts->sctx->pix_fmt, 
+		 ts->sctx->width, 
+		 ts->sctx->height);
+
+  if(-1 == avpicture_deinterlace(&deint_pic,
+				 (AVPicture *)ts->dec_frame,
+				 ts->sctx->pix_fmt,
+				 ts->sctx->width,
+				 ts->sctx->height)) {
+    tvhlog(LOG_ERR, "transcode", "Cannot deinterlace frame");
+    goto cleanup;
+  }
+    
+
   len = avpicture_get_size(ts->tctx->pix_fmt, ts->tctx->width, ts->tctx->height);
   buf = av_malloc(len + FF_INPUT_BUFFER_PADDING_SIZE);
   memset(buf, 0, len);
@@ -369,8 +390,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 				    NULL);
  
   sws_scale(ts->scaler, 
-            (const uint8_t * const*)ts->dec_frame->data, 
-            ts->dec_frame->linesize,
+            (const uint8_t * const*)deint_pic.data, 
+            deint_pic.linesize,
             0, 
             ts->sctx->height, 
             ts->enc_frame->data, 
@@ -427,7 +448,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     av_free(buf);
   if(out)
     av_free(out);
-
+  if(deint)
+    av_free(deint);
   return n;
 }
 
