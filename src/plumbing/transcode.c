@@ -17,6 +17,7 @@
 
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
+#include <libavutil/dict.h>
 
 #include "tvheadend.h"
 #include "streaming.h"
@@ -264,6 +265,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   //ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
   //ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
 
+  AVDictionary *opts = NULL;
+
   if(ts->tctx->codec_id == CODEC_ID_NONE) {
     ts->tctx->time_base.den = 25;
     ts->tctx->time_base.num = 1;
@@ -333,6 +336,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->bit_rate              = 2 * ts->tctx->width * ts->tctx->height;
       ts->tctx->bit_rate_tolerance    = ts->tctx->bit_rate  / 4;
       ts->tctx->flags                |= CODEC_FLAG_GLOBAL_HEADER;
+
+      av_dict_set(&opts, "profile", "baseline", 0);
       break;
     default:
       ts->tctx->codec_id = CODEC_ID_NONE;
@@ -340,7 +345,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     }
     
     AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
-    if(!codec || avcodec_open(ts->tctx, codec) < 0) {
+    if(!codec || avcodec_open2(ts->tctx, codec, &opts) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find video encoder");
       ts->tctx->codec_id = CODEC_ID_NONE;
       goto cleanup;
