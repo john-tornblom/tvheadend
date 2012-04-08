@@ -55,7 +55,6 @@ typedef struct transcoder {
   // transcoder private stuff
   transcoder_stream_t ts_audio;
   transcoder_stream_t ts_video;
-  size_t max_width;
   size_t max_height;
 
   //for the PID-regulator
@@ -676,7 +675,6 @@ transcoder_create(streaming_target_t *output,
 
   memset(t, 0, sizeof(transcoder_t));
   t->t_output = output;
-  t->max_width = max_width;
   t->max_height = max_height;
 
   transcoder_stream_create(&t->ts_video, v_codec);
