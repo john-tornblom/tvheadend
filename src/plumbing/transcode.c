@@ -415,7 +415,9 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   length = avcodec_encode_video(ts->tctx, out, len, ts->enc_frame);
   if(length <= 0) {
-    tvhlog(LOG_ERR, "transcode", "Unable to encode video (%d)", length);
+    if(length)
+      tvhlog(LOG_ERR, "transcode", "Unable to encode video (%d)", length);
+
     goto cleanup;
   }
   
