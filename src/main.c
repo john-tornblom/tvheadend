@@ -61,8 +61,6 @@
 #include "ffdecsa/FFdecsa.h"
 
 int running;
-extern const char *htsversion;
-extern const char *htsversion_full;
 time_t dispatch_clock;
 static LIST_HEAD(, gtimer) gtimers;
 pthread_mutex_t global_lock;
@@ -151,7 +149,7 @@ gtimer_disarm(gtimer_t *gti)
 static void
 usage(const char *argv0)
 {
-  printf("HTS Tvheadend %s\n", htsversion_full);
+  printf("HTS Tvheadend %s\n", tvheadend_version);
   printf("usage: %s [options]\n", argv0);
   printf("\n");
   printf(" -a <adapters>   Use only DVB adapters specified (csv)\n");
@@ -391,7 +389,7 @@ main(int argc, char **argv)
 #endif
   http_server_init();
 
-  webui_init(TVHEADEND_CONTENT_PATH);
+  webui_init(tvheadend_dataroot());
 
   serviceprobe_init();
 
@@ -435,9 +433,11 @@ main(int argc, char **argv)
   pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
   tvhlog(LOG_NOTICE, "START", "HTS Tvheadend version %s started, "
-	 "running as PID:%d UID:%d GID:%d, settings located in '%s'",
-	 htsversion_full,
-	 getpid(), getuid(), getgid(), hts_settings_get_root());
+	 "running as PID:%d UID:%d GID:%d, settings located in '%s', "
+	 "dataroot: %s",
+	 tvheadend_version,
+	 getpid(), getuid(), getgid(), hts_settings_get_root(),
+	 tvheadend_dataroot() ?: "<Embedded file system>");
 
   if(crash)
     abort();

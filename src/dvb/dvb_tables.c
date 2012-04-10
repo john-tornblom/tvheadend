@@ -828,7 +828,7 @@ static int
 dvb_ca_callback(th_dvb_mux_instance_t *tdmi, uint8_t *ptr, int len,
 		uint8_t tableid, void *opaque)
 {
-  cwc_emm(ptr, len);
+  cwc_emm(ptr, len, (uintptr_t)opaque);
   return 0;
 }
 
@@ -841,6 +841,7 @@ dvb_cat_callback(th_dvb_mux_instance_t *tdmi, uint8_t *ptr, int len,
 {
   int tag, tlen;
   uint16_t pid;
+  uintptr_t caid;
 
   if((ptr[2] & 1) == 0) {
     /* current_next_indicator == next, skip this */
@@ -856,13 +857,13 @@ dvb_cat_callback(th_dvb_mux_instance_t *tdmi, uint8_t *ptr, int len,
     len -= 2;
     switch(tag) {
     case DVB_DESC_CA:
-      //      caid = ( ptr[0]         << 8) | ptr[1];
+      caid = ( ptr[0]         << 8) | ptr[1];
       pid  = ((ptr[2] & 0x1f) << 8) | ptr[3];
 
       if(pid == 0)
 	break;
 
-      tdt_add(tdmi, NULL, dvb_ca_callback, NULL, "CA", 
+      tdt_add(tdmi, NULL, dvb_ca_callback, (void *)caid, "CA", 
 	      TDT_INC_TABLE_HDR, pid, NULL);
       break;
 
@@ -946,7 +947,7 @@ dvb_table_cable_delivery(th_dvb_mux_instance_t *tdmi, uint8_t *ptr, int len,
   dmc.dmc_fe_params.u.qam.fec_inner = fec_tab[ptr[10] & 0x07];
 
   dvb_mux_create(tdmi->tdmi_adapter, &dmc, tsid, NULL,
-		 "automatic mux discovery", 1, 1, NULL);
+		 "automatic mux discovery", 1, 1, NULL, NULL);
   return 0;
 }
 
@@ -1031,7 +1032,7 @@ dvb_table_sat_delivery(th_dvb_mux_instance_t *tdmi, uint8_t *ptr, int len,
 
 #endif
   dvb_mux_create(tdmi->tdmi_adapter, &dmc, tsid, NULL,
-		 "automatic mux discovery", 1, 1, NULL);
+		 "automatic mux discovery", 1, 1, NULL, NULL);
   
   return 0;
 }
