@@ -176,6 +176,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
       tvhlog(LOG_ERR, "transcode", "Unable to find audio encoder");
       goto cleanup;
     }
+    tvhlog(LOG_DEBUG, "transcode", "Using audio encoder %s", codec->name);
   }
 
   frame_bytes = av_get_bytes_per_sample(ts->tctx->sample_fmt) * 
@@ -464,6 +465,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->codec_id = CODEC_ID_NONE;
       goto cleanup;
     }
+    tvhlog(LOG_DEBUG, "transcode", "Using video encoder %s", codec->name);
   }
 
   AVPicture deint_pic;
@@ -649,6 +651,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
 	continue;
       }
+      tvhlog(LOG_DEBUG, "transcode", "Using audio decoder %s", codec->name);
 
       t->ts_audio.index = ssc_src->ssc_index;
 
@@ -673,6 +676,7 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
 	continue;
       }
+      tvhlog(LOG_DEBUG, "transcode", "Using video decoder %s", codec->name);
 
       t->ts_video.index = ssc_src->ssc_index;
 
