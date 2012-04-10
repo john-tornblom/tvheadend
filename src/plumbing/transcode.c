@@ -261,8 +261,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   ts->tctx->sample_aspect_ratio.num = ts->sctx->sample_aspect_ratio.num;
   ts->tctx->sample_aspect_ratio.den = ts->sctx->sample_aspect_ratio.den;
-  //ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
-  //ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
+  ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
+  ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
 
   AVDictionary *opts = NULL;
 
