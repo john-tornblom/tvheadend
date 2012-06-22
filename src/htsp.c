@@ -925,8 +925,10 @@ static htsmsg_t *
 htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 {
   uint32_t chid, sid, weight;
+#if CONFIG_TRANSCODER
   uint32_t  max_width, max_height;
   streaming_component_type_t acodec, vcodec;
+#endif
   channel_t *ch;
   htsp_subscription_t *hs;
 
@@ -941,10 +943,12 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
 
+#if CONFIG_TRANSCODER
   max_width = htsmsg_get_u32_or_default(in, "maxWidth", 0);
   max_height = htsmsg_get_u32_or_default(in, "maxHeight", 0);
   vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
   acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
+#endif
 
   /*
    * We send the reply now to avoid the user getting the 'subscriptionStart'
