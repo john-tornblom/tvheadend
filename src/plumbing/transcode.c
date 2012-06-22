@@ -15,6 +15,7 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <unistd.h>
 #include <libavcodec/avcodec.h>
 #include <libswscale/swscale.h>
 #include <libavutil/dict.h>
@@ -447,8 +448,6 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->flags2               |= CODEC_FLAG2_FASTPSKIP; // flags2=+bpyramid+mixed_refs+wpred+dct8x8+fastpskip
       ts->tctx->weighted_p_pred       = 2; // wpredp=2
 
-
-      ts->tctx->thread_count          = 1;
       ts->tctx->dsp_mask              = (AV_CPU_FLAG_MMX | AV_CPU_FLAG_MMX2 | AV_CPU_FLAG_SSE);
 
       ts->tctx->flags                |= CODEC_FLAG_GLOBAL_HEADER;
@@ -697,8 +696,10 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       ssc->ssc_frameduration = ssc_src->ssc_frameduration;
 
       t->ts_video.sctx->codec_type         = AVMEDIA_TYPE_VIDEO;
+      t->ts_video.sctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
 
       t->ts_video.tctx->codec_type         = AVMEDIA_TYPE_VIDEO;
+      t->ts_video.tctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
       t->ts_video.tctx->width              = ssc->ssc_width;
       t->ts_video.tctx->height             = ssc->ssc_height;
 
