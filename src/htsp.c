@@ -925,7 +925,7 @@ static htsmsg_t *
 htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 {
   uint32_t chid, sid, weight;
-#if CONFIG_TRANSCODER
+#ifdef CONFIG_TRANSCODER
   uint32_t  max_width, max_height;
   streaming_component_type_t acodec, vcodec;
 #endif
@@ -943,7 +943,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
 
-#if CONFIG_TRANSCODER
+#ifdef CONFIG_TRANSCODER
   max_width = htsmsg_get_u32_or_default(in, "maxWidth", 0);
   max_height = htsmsg_get_u32_or_default(in, "maxHeight", 0);
   vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
