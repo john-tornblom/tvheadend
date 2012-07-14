@@ -211,6 +211,8 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
     if(!codec || avcodec_open(ts->tctx, codec) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find audio encoder");
+      // Disable the stream
+      ts->sindex = 0;
       goto cleanup;
     }
     tvhlog(LOG_DEBUG, "transcode", "Using audio encoder %s", codec->name);
@@ -497,7 +499,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
     AVCodec *codec = avcodec_find_encoder(ts->tctx->codec_id);
     if(!codec || avcodec_open2(ts->tctx, codec, &opts) < 0) {
       tvhlog(LOG_ERR, "transcode", "Unable to find video encoder");
-      ts->tctx->codec_id = CODEC_ID_NONE;
+      // Disable the stream
+      ts->sindex = 0;
       goto cleanup;
     }
     tvhlog(LOG_DEBUG, "transcode", "Using video encoder %s", codec->name);
