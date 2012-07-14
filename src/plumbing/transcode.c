@@ -26,6 +26,8 @@
 #include "packet.h"
 #include "transcode.h"
 
+#define MAX_PASSTHROUGH_STREAMS 31
+
 /**
  * Reference to a transcoder stream
  */
@@ -33,7 +35,8 @@ typedef struct transcoder_stream {
   streaming_component_type_t ttype;
   AVCodecContext *sctx; // source
   AVCodecContext *tctx; // target
-  int            index; // refers to the stream index
+  int sindex; // refers to the source stream index
+  int tindex; // refers to the target stream index
 
   struct SwsContext *scaler; // used for scaling
   AVFrame           *dec_frame; // decoding buffer for video stream
@@ -48,6 +51,10 @@ typedef struct transcoder_stream {
   uint32_t           enc_offset;
 } transcoder_stream_t;
 
+typedef struct transcoder_passthrough {
+  int sindex; // refers to the source stream index
+  int tindex; // refers to the target stream index
+} transcoder_passthrough_t;
 
 typedef struct transcoder {
   streaming_target_t t_input;  // must be first
@@ -57,6 +64,10 @@ typedef struct transcoder {
   transcoder_stream_t ts_audio;
   transcoder_stream_t ts_video;
   size_t max_height;
+
+  // Passthrough streams
+  transcoder_passthrough_t pt_streams[MAX_PASSTHROUGH_STREAMS+1];
+  uint8_t pt_count;
 
   //for the PID-regulator
   int feedback_error;
@@ -116,6 +127,31 @@ transcoder_stream_destroy(transcoder_stream_t *ts)
     av_free(ts->enc_sample);
 }
 
+/**
+ * passthrough a stream
+ */
+static th_pkt_t *
+transcoder_stream_passthrough(transcoder_passthrough_t *pt, th_pkt_t *pkt)
+{
+  th_pkt_t *n = NULL;
+
+  n = pkt_alloc(pktbuf_ptr(pkt->pkt_payload), 
+		pktbuf_len(pkt->pkt_payload), 
+		pkt->pkt_pts, 
+		pkt->pkt_dts);
+
+  n->pkt_duration = pkt->pkt_duration;
+  n->pkt_commercial = pkt->pkt_commercial;
+  n->pkt_componentindex = pt->tindex;
+  n->pkt_frametype = pkt->pkt_frametype;
+  n->pkt_field = pkt->pkt_field;
+  n->pkt_channels = pkt->pkt_channels;
+  n->pkt_sri = pkt->pkt_sri;
+  n->pkt_aspect_num = pkt->pkt_aspect_num;
+  n->pkt_aspect_den = pkt->pkt_aspect_den;
+
+  return n;
+}
 
 /**
  * transcode an audio stream
@@ -209,7 +245,7 @@ transcoder_stream_audio(transcoder_stream_t *ts, th_pkt_t *pkt)
     n = pkt_alloc(ts->enc_sample, ts->enc_offset, pkt->pkt_pts, pkt->pkt_dts);
     n->pkt_duration = pkt->pkt_duration;
     n->pkt_commercial = pkt->pkt_commercial;
-    n->pkt_componentindex = pkt->pkt_componentindex;
+    n->pkt_componentindex = ts->tindex;
     n->pkt_frametype = pkt->pkt_frametype;
     n->pkt_field = pkt->pkt_field;
     n->pkt_channels = ts->tctx->channels;
@@ -548,7 +584,7 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   n->pkt_duration = pkt->pkt_duration;
 
   n->pkt_commercial = pkt->pkt_commercial;
-  n->pkt_componentindex = pkt->pkt_componentindex;
+  n->pkt_componentindex = ts->tindex;
   n->pkt_field = pkt->pkt_field;
 
   n->pkt_channels = pkt->pkt_channels;
@@ -583,10 +619,11 @@ static th_pkt_t*
 transcoder_packet(transcoder_t *t, th_pkt_t *pkt)
 {
   transcoder_stream_t *ts = NULL;
+  int i = 0;
 
-  if(pkt->pkt_componentindex == t->ts_video.index) {
+  if(pkt->pkt_componentindex == t->ts_video.sindex) {
     ts = &t->ts_video;
-  } else if (pkt->pkt_componentindex == t->ts_audio.index) {
+  } else if (pkt->pkt_componentindex == t->ts_audio.sindex) {
     ts = &t->ts_audio;
   }
 
@@ -596,9 +633,38 @@ transcoder_packet(transcoder_t *t, th_pkt_t *pkt)
     return transcoder_stream_video(ts, pkt);
   }
 
+  // Look for passthrough streams
+  for(i=0; i<t->pt_count; i++) {
+    if(t->pt_streams[i].sindex == pkt->pkt_componentindex) {
+      return transcoder_stream_passthrough(&t->pt_streams[i], pkt);
+    }
+  }
   return NULL;
 }
 
+/**
+ * Figure out how many streams we will use.
+ */
+static int
+transcoder_get_stream_count(streaming_start_t *ss) {
+  int i = 0;
+  int video = 0;
+  int audio = 0;
+  int passthrough = 0;
+  streaming_start_component_t *ssc = NULL;
+
+  for(i = 0; i < ss->ss_num_components; i++) {
+    ssc = &ss->ss_components[i];
+    video |= SCT_ISVIDEO(ssc->ssc_type);
+    audio |= SCT_ISAUDIO(ssc->ssc_type);
+    passthrough += (ssc->ssc_type == SCT_TEXTSUB);
+    passthrough += (ssc->ssc_type == SCT_DVBSUB);
+  }
+
+  passthrough = MIN(passthrough, MAX_PASSTHROUGH_STREAMS);
+
+  return (video + audio + passthrough);
+}
 
 /**
  * initializes eatch transcoding stream
@@ -607,14 +673,16 @@ static streaming_start_t *
 transcoder_start(transcoder_t *t, streaming_start_t *src)
 {
   int i = 0;
+  int j = 0;
+  int stream_count = transcoder_get_stream_count(src);
   streaming_start_t *ss = NULL;
 
   t->feedback_clock = dispatch_clock;
 
-  ss = malloc(sizeof(streaming_start_t) + sizeof(streaming_start_component_t) * 2);
-  memset(ss, 0, sizeof(streaming_start_t) + sizeof(streaming_start_component_t) * 2);
+  ss = malloc(sizeof(streaming_start_t) + sizeof(streaming_start_component_t) * stream_count);
+  memset(ss, 0, sizeof(streaming_start_t) + sizeof(streaming_start_component_t) * stream_count);
 
-  ss->ss_num_components = 2;
+  ss->ss_num_components = stream_count;
   ss->ss_refcount = 1;
   ss->ss_pcr_pid = src->ss_pcr_pid;
   service_source_info_copy(&ss->ss_si, &src->ss_si);
@@ -644,7 +712,12 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       break;
     }
 
-    if (!t->ts_audio.index && SCT_ISAUDIO(ssc_src->ssc_type)) {
+    // Sanity check, should not happend
+    if(j >= stream_count) {
+      break;
+    }
+
+    if (!t->ts_audio.sindex && SCT_ISAUDIO(ssc_src->ssc_type)) {
       AVCodec *codec = avcodec_find_decoder(codec_id);
       if(!codec || avcodec_open(t->ts_audio.sctx, codec) < 0) {
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
@@ -652,10 +725,13 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       }
       tvhlog(LOG_DEBUG, "transcode", "Using audio decoder %s", codec->name);
 
-      t->ts_audio.index = ssc_src->ssc_index;
+      streaming_start_component_t *ssc = &ss->ss_components[j++];
+      
+      // Use same index for both source and target, globalheaders seems to need it.
+      t->ts_audio.sindex = ssc_src->ssc_index;
+      t->ts_audio.tindex = ssc_src->ssc_index;
 
-      streaming_start_component_t *ssc = &ss->ss_components[0];
-      ssc->ssc_index    = ssc_src->ssc_index;
+      ssc->ssc_index    = t->ts_audio.tindex;
       ssc->ssc_type     = t->ts_audio.ttype;
       ssc->ssc_sri      = ssc_src->ssc_sri;
       ssc->ssc_channels = MIN(2, ssc_src->ssc_channels);
@@ -664,12 +740,14 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       t->ts_audio.sctx->codec_type = AVMEDIA_TYPE_AUDIO;
       t->ts_audio.tctx->codec_type = AVMEDIA_TYPE_AUDIO;
 
-      tvhlog(LOG_INFO, "transcode", "%s ==> %s", 
+      tvhlog(LOG_INFO, "transcode", "%d:%s ==> %d:%s", 
+	     t->ts_audio.sindex,
 	     streaming_component_type2txt(ssc_src->ssc_type),
+	     t->ts_audio.tindex,
 	     streaming_component_type2txt(ssc->ssc_type));
     }
 
-    if (!t->ts_video.index && SCT_ISVIDEO(ssc_src->ssc_type)) {
+    if (!t->ts_video.sindex && SCT_ISVIDEO(ssc_src->ssc_type)) {
       AVCodec *codec = avcodec_find_decoder(codec_id);
       if(!codec || avcodec_open(t->ts_video.sctx, codec) < 0) {
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
@@ -677,11 +755,13 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       }
       tvhlog(LOG_DEBUG, "transcode", "Using video decoder %s", codec->name);
 
-      t->ts_video.index = ssc_src->ssc_index;
+      streaming_start_component_t *ssc = &ss->ss_components[j++];
 
-      streaming_start_component_t *ssc = &ss->ss_components[1];
+      // Use same index for both source and target, globalheaders seems to need it.
+      t->ts_video.sindex = ssc_src->ssc_index;
+      t->ts_video.tindex = ssc_src->ssc_index;
 
-      ssc->ssc_index         = ssc_src->ssc_index;
+      ssc->ssc_index         = t->ts_video.tindex;
       ssc->ssc_type          = t->ts_video.ttype;
       ssc->ssc_aspect_num    = ssc_src->ssc_aspect_num;
       ssc->ssc_aspect_den    = ssc_src->ssc_aspect_den;
@@ -703,13 +783,35 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       t->ts_video.tctx->width              = ssc->ssc_width;
       t->ts_video.tctx->height             = ssc->ssc_height;
 
-      tvhlog(LOG_INFO, "transcode", "%s %dx%d ==> %s %dx%d", 
+      tvhlog(LOG_INFO, "transcode", "%d:%s %dx%d ==> %d:%s %dx%d", 
+	     t->ts_video.sindex,
 	     streaming_component_type2txt(ssc_src->ssc_type),
 	     ssc_src->ssc_width,
 	     ssc_src->ssc_height,
+	     t->ts_video.tindex,
 	     streaming_component_type2txt(ssc->ssc_type),
 	     ssc->ssc_width,
 	     ssc->ssc_height);
+    } else if (ssc_src->ssc_type == SCT_TEXTSUB || ssc_src->ssc_type == SCT_DVBSUB) {
+      streaming_start_component_t *ssc = &ss->ss_components[j++];
+      int pt_index = t->pt_count++;
+
+      // Use same index for both source and target, globalheaders seems to need it.
+      t->pt_streams[pt_index].sindex = ssc_src->ssc_index;
+      t->pt_streams[pt_index].tindex = ssc_src->ssc_index;
+
+      ssc->ssc_index          = ssc_src->ssc_index;
+      ssc->ssc_type           = ssc_src->ssc_type;
+      ssc->ssc_composition_id = ssc_src->ssc_composition_id;
+      ssc->ssc_ancillary_id   = ssc_src->ssc_ancillary_id;
+      memcpy(ssc->ssc_lang, ssc_src->ssc_lang, 4);
+
+      tvhlog(LOG_INFO, "transcode", "%d:%s (%s) ==> %d:PASSTHROUGH", 
+	     t->pt_streams[pt_index].sindex,
+	     streaming_component_type2txt(ssc_src->ssc_type),
+	     ssc->ssc_lang,
+	     t->pt_streams[pt_index].tindex
+	    );
     }
   }
 
@@ -733,8 +835,10 @@ transcoder_stop(transcoder_t *t)
   t->ts_video.sctx->codec_id = CODEC_ID_NONE;
   t->ts_video.tctx->codec_id = CODEC_ID_NONE;
 
-  t->ts_audio.index = 0;
-  t->ts_video.index = 0;
+  t->ts_audio.sindex = 0;
+  t->ts_video.sindex = 0;
+  t->ts_audio.tindex = 0;
+  t->ts_video.tindex = 0;
 }
 
 
