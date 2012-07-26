@@ -234,6 +234,7 @@ function accessUpdate(o) {
 	    title: 'Configuration', 
 	    iconCls: 'wrench',
 	    items: [new tvheadend.chconf,
+      new tvheadend.transcode,
 		    new tvheadend.xmltv,
 		    new tvheadend.cteditor,
 		    new tvheadend.dvrsettings,

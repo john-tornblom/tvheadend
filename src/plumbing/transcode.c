@@ -32,6 +32,7 @@
  * Reference to a transcoder stream
  */
 typedef struct transcoder_stream {
+  streaming_component_type_t stype;
   streaming_component_type_t ttype;
   AVCodecContext *sctx; // source
   AVCodecContext *tctx; // target
@@ -49,7 +50,12 @@ typedef struct transcoder_stream {
   uint8_t           *enc_sample; // encoding buffer for audio stream
   uint32_t           enc_size;
   uint32_t           enc_offset;
+
+  LIST_ENTRY(transcoder_stream) link;
 } transcoder_stream_t;
+
+typedef LIST_HEAD(, transcoder_stream) transcoder_stream_list_t;
+
 
 typedef struct transcoder_passthrough {
   int sindex; // refers to the source stream index
@@ -61,9 +67,11 @@ typedef struct transcoder {
   streaming_target_t *t_output;
   
   // transcoder private stuff
-  transcoder_stream_t ts_audio;
-  transcoder_stream_t ts_video;
-  size_t max_height;
+  transcoder_stream_t *ts_audio;
+  transcoder_stream_t *ts_video;
+  transcoder_stream_list_t ts_video_list;
+  transcoder_stream_list_t ts_audio_list;
+  size_t max_height; // TODO: probably the wrong place?
 
   // Passthrough streams
   transcoder_passthrough_t pt_streams[MAX_PASSTHROUGH_STREAMS+1];
@@ -75,25 +83,48 @@ typedef struct transcoder {
   time_t feedback_clock;
 } transcoder_t;
 
-
 /**
  * allocate the buffers used by a transcoder stream
  */
 static void
-transcoder_stream_create(transcoder_stream_t *ts, streaming_component_type_t type)
+transcoder_stream_create
+(transcoder_t *t, streaming_component_type_t icodec, streaming_component_type_t ocodec)
 {
-  memset(ts, 0, sizeof(transcoder_stream_t));
+  transcoder_stream_list_t *list;
+  transcoder_stream_t *ts;
 
-  ts->ttype = type;
-  ts->sctx = avcodec_alloc_context();
-  ts->tctx = avcodec_alloc_context();
+  /* Video */
+  // TODO: do this properly with ANY/PASSTHRU
+  // and validate that icodec and ocodec are the same!
+  if (SCT_ISVIDEO(icodec) || SCT_ISVIDEO(ocodec))
+    list = &t->ts_video_list;
 
-  if(SCT_ISVIDEO(type)) {
+  /* Audio */
+  else if (SCT_ISAUDIO(icodec) || SCT_ISAUDIO(ocodec))
+    list = &t->ts_audio_list;
+
+  /* WTF? */
+  else
+    return;
+
+  /* Check for existing */
+  LIST_FOREACH(ts, list, link)
+    if (ts->stype == icodec) return;
+  
+  /* Create new entry */
+  ts = calloc(1, sizeof(transcoder_stream_t));
+  ts->stype = icodec;
+  ts->ttype = ocodec;
+  ts->sctx  = avcodec_alloc_context();
+  ts->tctx  = avcodec_alloc_context();
+  LIST_INSERT_HEAD(list, ts, link);
+
+  if(list == &t->ts_video_list) {
     ts->dec_frame = avcodec_alloc_frame();
     ts->enc_frame = avcodec_alloc_frame();
     avcodec_get_frame_defaults(ts->dec_frame);
     avcodec_get_frame_defaults(ts->enc_frame);
-  } else if(SCT_ISAUDIO(type)) {
+  } else {
     ts->dec_size = AVCODEC_MAX_AUDIO_FRAME_SIZE*2;
     ts->dec_sample = av_malloc(ts->dec_size + FF_INPUT_BUFFER_PADDING_SIZE);
     memset(ts->dec_sample, 0, ts->dec_size + FF_INPUT_BUFFER_PADDING_SIZE);
@@ -103,7 +134,6 @@ transcoder_stream_create(transcoder_stream_t *ts, streaming_component_type_t typ
     memset(ts->enc_sample, 0, ts->enc_size + FF_INPUT_BUFFER_PADDING_SIZE);
   }
 }
-
 
 /**
  * free all buffers used by a transcoder stream
@@ -301,8 +331,8 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
 
   ts->tctx->sample_aspect_ratio.num = ts->sctx->sample_aspect_ratio.num;
   ts->tctx->sample_aspect_ratio.den = ts->sctx->sample_aspect_ratio.den;
-  ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
-  ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
+  //ts->tctx->sample_aspect_ratio.num = ts->dec_frame->sample_aspect_ratio.num;
+ // ts->tctx->sample_aspect_ratio.den = ts->dec_frame->sample_aspect_ratio.den;
 
   AVDictionary *opts = NULL;
 
@@ -624,10 +654,10 @@ transcoder_packet(transcoder_t *t, th_pkt_t *pkt)
   transcoder_stream_t *ts = NULL;
   int i = 0;
 
-  if(pkt->pkt_componentindex == t->ts_video.sindex) {
-    ts = &t->ts_video;
-  } else if (pkt->pkt_componentindex == t->ts_audio.sindex) {
-    ts = &t->ts_audio;
+  if(pkt->pkt_componentindex == t->ts_video->sindex) {
+    ts = t->ts_video;
+  } else if (pkt->pkt_componentindex == t->ts_audio->sindex) {
+    ts = t->ts_audio;
   }
 
   if(ts && ts->sctx->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -667,6 +697,17 @@ transcoder_get_stream_count(streaming_start_t *ss) {
   passthrough = MIN(passthrough, MAX_PASSTHROUGH_STREAMS);
 
   return (video + audio + passthrough);
+}
+
+static transcoder_stream_t *_transcoder_find_codec_rule
+  ( transcoder_stream_list_t *list, streaming_component_type_t icodec )
+{
+  transcoder_stream_t *def = NULL, *st;
+  LIST_FOREACH(st, list, link) {
+    if (st->stype == icodec) return st;
+    if (st->stype == SCT_UNKNOWN) def = st;
+  }
+  return def;
 }
 
 /**
@@ -720,9 +761,12 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       break;
     }
 
-    if (!t->ts_audio.sindex && SCT_ISAUDIO(ssc_src->ssc_type)) {
+    if (!t->ts_audio && SCT_ISAUDIO(ssc_src->ssc_type)) {
+      t->ts_audio = _transcoder_find_codec_rule(&t->ts_audio_list, ssc_src->ssc_type);
+      if (!t->ts_audio) continue;
+      // TODO: passthru (for same format)
       AVCodec *codec = avcodec_find_decoder(codec_id);
-      if(!codec || avcodec_open(t->ts_audio.sctx, codec) < 0) {
+      if(!codec || avcodec_open(t->ts_audio->sctx, codec) < 0) {
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
 	continue;
       }
@@ -731,28 +775,30 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       streaming_start_component_t *ssc = &ss->ss_components[j++];
       
       // Use same index for both source and target, globalheaders seems to need it.
-      t->ts_audio.sindex = ssc_src->ssc_index;
-      t->ts_audio.tindex = ssc_src->ssc_index;
+      t->ts_audio->sindex = ssc_src->ssc_index;
+      t->ts_audio->tindex = ssc_src->ssc_index;
 
-      ssc->ssc_index    = t->ts_audio.tindex;
-      ssc->ssc_type     = t->ts_audio.ttype;
+      ssc->ssc_index    = t->ts_audio->tindex;
+      ssc->ssc_type     = t->ts_audio->ttype;
       ssc->ssc_sri      = ssc_src->ssc_sri;
       ssc->ssc_channels = MIN(2, ssc_src->ssc_channels);
       memcpy(ssc->ssc_lang, ssc_src->ssc_lang, 4);
 
-      t->ts_audio.sctx->codec_type = AVMEDIA_TYPE_AUDIO;
-      t->ts_audio.tctx->codec_type = AVMEDIA_TYPE_AUDIO;
+      t->ts_audio->sctx->codec_type = AVMEDIA_TYPE_AUDIO;
+      t->ts_audio->tctx->codec_type = AVMEDIA_TYPE_AUDIO;
 
       tvhlog(LOG_INFO, "transcode", "%d:%s ==> %d:%s", 
-	     t->ts_audio.sindex,
+	     t->ts_audio->sindex,
 	     streaming_component_type2txt(ssc_src->ssc_type),
-	     t->ts_audio.tindex,
+	     t->ts_audio->tindex,
 	     streaming_component_type2txt(ssc->ssc_type));
     }
 
-    if (!t->ts_video.sindex && SCT_ISVIDEO(ssc_src->ssc_type)) {
+    if (!t->ts_video && SCT_ISVIDEO(ssc_src->ssc_type)) {
+      t->ts_video = _transcoder_find_codec_rule(&t->ts_video_list, codec_id);
+      if (!t->ts_video) continue;
       AVCodec *codec = avcodec_find_decoder(codec_id);
-      if(!codec || avcodec_open(t->ts_video.sctx, codec) < 0) {
+      if(!codec || avcodec_open(t->ts_video->sctx, codec) < 0) {
 	tvhlog(LOG_ERR, "transcode", "Unable to find %s decoder", streaming_component_type2txt(ssc_src->ssc_type));
 	continue;
       }
@@ -761,37 +807,40 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
       streaming_start_component_t *ssc = &ss->ss_components[j++];
 
       // Use same index for both source and target, globalheaders seems to need it.
-      t->ts_video.sindex = ssc_src->ssc_index;
-      t->ts_video.tindex = ssc_src->ssc_index;
+      t->ts_video->sindex = ssc_src->ssc_index;
+      t->ts_video->tindex = ssc_src->ssc_index;
 
-      ssc->ssc_index         = t->ts_video.tindex;
-      ssc->ssc_type          = t->ts_video.ttype;
+      ssc->ssc_index         = t->ts_video->tindex;
+      ssc->ssc_type          = t->ts_video->ttype;
       ssc->ssc_aspect_num    = ssc_src->ssc_aspect_num;
       ssc->ssc_aspect_den    = ssc_src->ssc_aspect_den;
-      ssc->ssc_height        = MIN(t->max_height, ssc_src->ssc_height);
-      if(ssc->ssc_height&1)
-	ssc->ssc_height++;
 
-      ssc->ssc_width         = ssc->ssc_height * ((double)ssc_src->ssc_width / ssc_src->ssc_height);
-      if(ssc->ssc_width&1)
-	ssc->ssc_width++;
+      if (t->max_height) {
+        ssc->ssc_height        = MIN(t->max_height, ssc_src->ssc_height);
+        if(ssc->ssc_height&1) ssc->ssc_height++;
+        ssc->ssc_width         = ssc->ssc_height * ((double)ssc_src->ssc_width / ssc_src->ssc_height);
+        if(ssc->ssc_width&1) ssc->ssc_width++;
+      } else {
+        ssc->ssc_height        = ssc_src->ssc_height;
+        ssc->ssc_width         = ssc_src->ssc_width;
+      }
 
       ssc->ssc_frameduration = ssc_src->ssc_frameduration;
 
-      t->ts_video.sctx->codec_type         = AVMEDIA_TYPE_VIDEO;
-      t->ts_video.sctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
+      t->ts_video->sctx->codec_type         = AVMEDIA_TYPE_VIDEO;
+      t->ts_video->sctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
 
-      t->ts_video.tctx->codec_type         = AVMEDIA_TYPE_VIDEO;
-      t->ts_video.tctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
-      t->ts_video.tctx->width              = ssc->ssc_width;
-      t->ts_video.tctx->height             = ssc->ssc_height;
+      t->ts_video->tctx->codec_type         = AVMEDIA_TYPE_VIDEO;
+      t->ts_video->tctx->thread_count       = sysconf(_SC_NPROCESSORS_ONLN);
+      t->ts_video->tctx->width              = ssc->ssc_width;
+      t->ts_video->tctx->height             = ssc->ssc_height;
 
       tvhlog(LOG_INFO, "transcode", "%d:%s %dx%d ==> %d:%s %dx%d", 
-	     t->ts_video.sindex,
+	     t->ts_video->sindex,
 	     streaming_component_type2txt(ssc_src->ssc_type),
 	     ssc_src->ssc_width,
 	     ssc_src->ssc_height,
-	     t->ts_video.tindex,
+	     t->ts_video->tindex,
 	     streaming_component_type2txt(ssc->ssc_type),
 	     ssc->ssc_width,
 	     ssc->ssc_height);
@@ -828,20 +877,20 @@ transcoder_start(transcoder_t *t, streaming_start_t *src)
 static void
 transcoder_stop(transcoder_t *t)
 {
-  avcodec_close(t->ts_audio.sctx);
-  avcodec_close(t->ts_audio.tctx);
-  avcodec_close(t->ts_video.sctx);
-  avcodec_close(t->ts_video.tctx);
+  avcodec_close(t->ts_audio->sctx);
+  avcodec_close(t->ts_audio->tctx);
+  avcodec_close(t->ts_video->sctx);
+  avcodec_close(t->ts_video->tctx);
 
-  t->ts_audio.sctx->codec_id = CODEC_ID_NONE;
-  t->ts_audio.tctx->codec_id = CODEC_ID_NONE;
-  t->ts_video.sctx->codec_id = CODEC_ID_NONE;
-  t->ts_video.tctx->codec_id = CODEC_ID_NONE;
+  t->ts_audio->sctx->codec_id = CODEC_ID_NONE;
+  t->ts_audio->tctx->codec_id = CODEC_ID_NONE;
+  t->ts_video->sctx->codec_id = CODEC_ID_NONE;
+  t->ts_video->tctx->codec_id = CODEC_ID_NONE;
 
-  t->ts_audio.sindex = 0;
-  t->ts_video.sindex = 0;
-  t->ts_audio.tindex = 0;
-  t->ts_video.tindex = 0;
+  t->ts_audio->sindex = 0;
+  t->ts_video->sindex = 0;
+  t->ts_audio->tindex = 0;
+  t->ts_video->tindex = 0;
 }
 
 
@@ -893,19 +942,41 @@ transcoder_input(void *opaque, streaming_message_t *sm)
  *
  */
 streaming_target_t *
-transcoder_create(streaming_target_t *output, 
-		  size_t max_width, size_t max_height,
-		  streaming_component_type_t v_codec, 
-		  streaming_component_type_t a_codec)
+transcoder_create(streaming_target_t *output, htsmsg_t *config)
 {
+  htsmsg_t *codeclist, *rule;
+  htsmsg_field_t *f;
+  streaming_component_type_t icodec, ocodec;
   transcoder_t *t = calloc(1, sizeof(transcoder_t));
 
   memset(t, 0, sizeof(transcoder_t));
   t->t_output = output;
-  t->max_height = max_height;
+  t->max_height = htsmsg_get_u32_or_default(config, "maxHeight", 0);
 
-  transcoder_stream_create(&t->ts_video, v_codec);
-  transcoder_stream_create(&t->ts_audio, a_codec);
+  /* Explicit mappings */
+  codeclist = htsmsg_get_list(config, "codecs");
+  if (codeclist) {
+    // TODO: probably want some special stream types to represent ANY
+    //       and PASSTHRU?
+    HTSMSG_FOREACH(f, codeclist) {
+      if ((rule = htsmsg_get_map_by_field(f))) {
+        icodec = streaming_component_txt2type(htsmsg_get_str(rule, "from"));
+        if (icodec == -1) icodec = SCT_UNKNOWN;
+        ocodec = streaming_component_txt2type(htsmsg_get_str(rule, "to"));
+        if (ocodec != -1) {
+          transcoder_stream_create(t, icodec, ocodec);
+        }
+      }
+    }
+  }
+
+  /* Default rules */
+  ocodec = streaming_component_txt2type(htsmsg_get_str(config, "videoCodec"));
+  if (ocodec != -1)
+    transcoder_stream_create(t, SCT_UNKNOWN, ocodec);
+  ocodec = streaming_component_txt2type(htsmsg_get_str(config, "audioCodec"));
+  if (ocodec != -1)
+    transcoder_stream_create(t, SCT_UNKNOWN, ocodec);
 
   streaming_target_init(&t->t_input, transcoder_input, t, 0);
   return &t->t_input;
@@ -922,7 +993,7 @@ void
 transcoder_set_network_speed(streaming_target_t *st, int speed)
 {
   transcoder_t *t = (transcoder_t *)st;
-  transcoder_stream_t *ts = &t->ts_video;
+  transcoder_stream_t *ts = t->ts_video;
 
   if(!ts->tctx)
     return;
@@ -962,8 +1033,10 @@ transcoder_destroy(streaming_target_t *st)
 {
   transcoder_t *t = (transcoder_t *)st;
 
-  transcoder_stream_destroy(&t->ts_video);
-  transcoder_stream_destroy(&t->ts_audio);
+  // TODO: flush lists etc...
+
+  transcoder_stream_destroy(t->ts_video);
+  transcoder_stream_destroy(t->ts_audio);
   free(t);
 }
 
@@ -977,3 +1050,13 @@ transcoder_init(void)
   avcodec_register_all();
 }
 
+
+/**
+ * TODO: add support for profiles
+ *       including list of currently supported ones, loading, setting, etc..
+ */
+htsmsg_t *
+transcoder_get_profile ( const char *name )
+{
+  return NULL;
+}
