@@ -926,8 +926,8 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 {
   uint32_t chid, sid, weight;
 #ifdef CONFIG_TRANSCODER
-  uint32_t  max_width, max_height;
-  streaming_component_type_t acodec, vcodec;
+  const char *tr_prof_name;
+  htsmsg_t *tr_profile = NULL;
 #endif
   channel_t *ch;
   htsp_subscription_t *hs;
@@ -944,10 +944,10 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
 
 #ifdef CONFIG_TRANSCODER
-  max_width = htsmsg_get_u32_or_default(in, "maxWidth", 0);
-  max_height = htsmsg_get_u32_or_default(in, "maxHeight", 0);
-  vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
-  acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
+  if ((tr_prof_name = htsmsg_get_str(in, "profile")))
+    tr_profile = transcoder_get_profile(tr_prof_name);
+  else
+    tr_profile = in;
 #endif
 
   /*
@@ -968,13 +968,10 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   streaming_target_init(&hs->hs_input, htsp_streaming_input, hs, 0);
 
 #ifdef CONFIG_TRANSCODER
-  if(max_width && max_height) {
-    hs->hs_transcoder = transcoder_create(&hs->hs_input, 
-					  max_width, 
-					  max_height,
-					  vcodec,
-					  acodec);
-    hs->hs_tsfix = tsfix_create(hs->hs_transcoder);
+  if (tr_profile) {
+    hs->hs_transcoder = transcoder_create(&hs->hs_input, tr_profile);
+    if (hs->hs_transcoder)
+      hs->hs_tsfix = tsfix_create(hs->hs_transcoder);
   }
   hs->hs_s = subscription_create_from_channel(ch, weight,
 					      htsp->htsp_logname,

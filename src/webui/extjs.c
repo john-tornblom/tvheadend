@@ -131,6 +131,9 @@ extjs_root(http_connection_t *hc, const char *remain, void *opaque)
   extjs_load(hq, "static/app/epg.js");
   extjs_load(hq, "static/app/dvr.js");
   extjs_load(hq, "static/app/xmltv.js");
+#if ENABLE_TRANSCODE
+  extjs_load(hq, "static/app/transcode.js");
+#endif
 
   /**
    * Finally, the app itself

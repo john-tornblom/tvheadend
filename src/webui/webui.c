@@ -392,11 +392,11 @@ http_stream_service(http_connection_t *hc, service_t *service)
     acodec = SCT_MPEG2AUDIO;
 
   if(transcode)
-    tr = transcoder_create(gh, 
+    tr = transcoder_create(gh, NULL);/*
                           width, 
                           height,
                           vcodec,
-                          acodec);
+                          acodec);*/
   if(tr)
     tsfix = tsfix_create(tr);
   else
@@ -459,11 +459,11 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
     acodec = SCT_MPEG2AUDIO;
 
   if(transcode)
-    tr = transcoder_create(gh, 
+    tr = transcoder_create(gh, NULL);/*
                           width, 
                           height,
                           vcodec,
-                          acodec);
+                          acodec);*/
   if(tr)
     tsfix = tsfix_create(tr);
   else
