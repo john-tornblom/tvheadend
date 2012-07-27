@@ -926,7 +926,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 {
   uint32_t chid, sid, weight;
 #ifdef CONFIG_TRANSCODER
-  uint32_t  max_width, max_height;
+  uint32_t max_resolution;
   streaming_component_type_t acodec, vcodec;
 #endif
   channel_t *ch;
@@ -944,8 +944,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
 
 #ifdef CONFIG_TRANSCODER
-  max_width = htsmsg_get_u32_or_default(in, "maxWidth", 0);
-  max_height = htsmsg_get_u32_or_default(in, "maxHeight", 0);
+  max_resolution = htsmsg_get_u32_or_default(in, "maxWidth", 0);
   vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
   acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
 #endif
@@ -968,10 +967,9 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   streaming_target_init(&hs->hs_input, htsp_streaming_input, hs, 0);
 
 #ifdef CONFIG_TRANSCODER
-  if(max_width && max_height) {
+  if(max_resolution) {
     hs->hs_transcoder = transcoder_create(&hs->hs_input, 
-					  max_width, 
-					  max_height,
+					  max_resolution,
 					  vcodec,
 					  acodec);
     hs->hs_tsfix = tsfix_create(hs->hs_transcoder);

@@ -374,16 +374,12 @@ http_stream_service(http_connection_t *hc, service_t *service)
 #ifdef CONFIG_TRANSCODER
   streaming_target_t *tr = NULL;
   int transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
-  int width = ATOI(http_arg_get(&hc->hc_req_args, "width"), 480);
-  int height = ATOI(http_arg_get(&hc->hc_req_args, "height"), 384);
+  int resolution = ATOI(http_arg_get(&hc->hc_req_args, "resolution"), 480);
   streaming_component_type_t vcodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "vcodec"));
   streaming_component_type_t acodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "acodec"));
 
-  width = MIN(width, 576);
-  height = MIN(height, 480);
-
-  width = MAX(width, 144);
-  height = MAX(height, 120);
+  resolution = MIN(resolution, 576);
+  resolution = MAX(resolution, 144);
 
   if(!SCT_ISVIDEO(vcodec))
     vcodec = SCT_MPEG2VIDEO;
@@ -393,10 +389,9 @@ http_stream_service(http_connection_t *hc, service_t *service)
 
   if(transcode)
     tr = transcoder_create(gh, 
-                          width, 
-                          height,
-                          vcodec,
-                          acodec);
+			   resolution,
+			   vcodec,
+			   acodec);
   if(tr)
     tsfix = tsfix_create(tr);
   else
@@ -441,16 +436,12 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 #ifdef CONFIG_TRANSCODER
   streaming_target_t *tr = NULL;
   int transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
-  int width = ATOI(http_arg_get(&hc->hc_req_args, "width"), 480);
-  int height = ATOI(http_arg_get(&hc->hc_req_args, "height"), 384);
+  int resolution = ATOI(http_arg_get(&hc->hc_req_args, "resolution"), 480);
   streaming_component_type_t vcodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "vcodec"));
   streaming_component_type_t acodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "acodec"));
 
-  width = MIN(width, 576);
-  height = MIN(height, 480);
-
-  width = MAX(width, 144);
-  height = MAX(height, 120);
+  resolution = MIN(resolution, 576);
+  resolution = MAX(resolution, 144);
 
   if(!SCT_ISVIDEO(vcodec))
     vcodec = SCT_MPEG2VIDEO;
@@ -460,10 +451,9 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 
   if(transcode)
     tr = transcoder_create(gh, 
-                          width, 
-                          height,
-                          vcodec,
-                          acodec);
+			   resolution, 
+			   vcodec,
+			   acodec);
   if(tr)
     tsfix = tsfix_create(tr);
   else

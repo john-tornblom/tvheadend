@@ -20,9 +20,9 @@
 #include "tvheadend.h"
 
 streaming_target_t *transcoder_create(streaming_target_t *output, 
-				      size_t max_width, size_t max_height,
-				      streaming_component_type_t v_codec, 
-				      streaming_component_type_t a_codec);
+				      size_t max_resolution,
+				      streaming_component_type_t vtype, 
+				      streaming_component_type_t atype);
 
 void transcoder_set_network_speed(streaming_target_t *st, int speed);
 void transcoder_destroy(streaming_target_t *gh);
