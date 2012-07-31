@@ -736,7 +736,9 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
   n->pkt_aspect_den = pkt->pkt_aspect_den;
   
   if(ts->tctx->coded_frame && ts->tctx->coded_frame->pts != AV_NOPTS_VALUE) {
+    n->pkt_dts -= n->pkt_pts;
     n->pkt_pts = ts->tctx->coded_frame->pts;
+    n->pkt_dts += n->pkt_pts;
   }
   if(ts->tctx->extradata_size) {
     n->pkt_header = pktbuf_alloc(ts->tctx->extradata, ts->tctx->extradata_size);
