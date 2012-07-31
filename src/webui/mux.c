@@ -127,6 +127,8 @@ mux_add_stream(mux_t *mux, const streaming_start_component_t *ssc)
     return -1;
 
   st->id = ssc->ssc_index;
+  st->time_base = AV_TIME_BASE_Q;
+
   c = st->codec;
   c->codec_id = mux_get_codec_id(ssc->ssc_type);
 
@@ -153,7 +155,6 @@ mux_add_stream(mux_t *mux, const streaming_start_component_t *ssc)
 
     st->sample_aspect_ratio.num = c->sample_aspect_ratio.num;
     st->sample_aspect_ratio.den = c->sample_aspect_ratio.den;
-    st->time_base = AV_TIME_BASE_Q;
   } else if(SCT_ISSUBTITLE(ssc->ssc_type)) {
     c->codec_type = AVMEDIA_TYPE_SUBTITLE;
   }
