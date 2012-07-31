@@ -47,7 +47,7 @@ mux_get_codec_id(streaming_component_type_t type)
     codec_id = CODEC_ID_DVB_SUBTITLE;
     break;
   case SCT_TEXTSUB:
-    codec_id = CODEC_ID_SRT;
+    codec_id = CODEC_ID_TEXT;
     break;
  case SCT_TELETEXT:
     codec_id = CODEC_ID_DVB_TELETEXT;
