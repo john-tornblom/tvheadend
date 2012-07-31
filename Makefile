@@ -120,6 +120,7 @@ ${BUILDDIR}/src/ffdecsa/ffdecsa_sse2.o : CFLAGS = -msse2
 #
 SRCS += src/webui/webui.c \
 	src/webui/comet.c \
+	src/webui/mux.c \
 	src/webui/extjs.c \
 	src/webui/simpleui.c \
 	src/webui/statedump.c \

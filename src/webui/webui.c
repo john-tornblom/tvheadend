@@ -34,7 +34,7 @@
 #include "http.h"
 #include "webui.h"
 #include "dvr/dvr.h"
-#include "dvr/mkmux.h"
+#include "mux.h"
 #include "filebundle.h"
 #include "psi.h"
 #include "plumbing/tsfix.h"
@@ -131,11 +131,12 @@ page_static_file(http_connection_t *hc, const char *remain, void *opaque)
  * HTTP stream loop
  */
 static void
-http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t *s)
+http_stream_run(http_connection_t *hc, streaming_queue_t *sq, 
+		th_subscription_t *s, mux_container_type_t mc)
 {
   streaming_message_t *sm;
   int run = 1;
-  mk_mux_t *mkm = NULL;
+  mux_t *mux = NULL;
   uint32_t event_id = 0;
   int timeouts = 0;
 
@@ -176,10 +177,10 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
 
     switch(sm->sm_type) {
     case SMT_PACKET: {
-      if(!mkm)
+      if(!mux)
 	break;
 
-      run = !mk_mux_write_pkt(mkm, sm->sm_data);
+      run = !mux_write_pkt(mux, sm->sm_data);
       sm->sm_data = NULL;
 
       event_t *e = NULL;
@@ -188,7 +189,7 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
 
       if(e && event_id != e->e_id) {
 	event_id = e->e_id;
-	run = !mk_mux_append_meta(mkm, e);
+	run = !mux_write_meta(mux, e);
       }
       break;
     }
@@ -201,7 +202,7 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
       else
 	http_output_content(hc, "video/x-matroska");
 
-      mkm = mk_mux_stream_create(hc->hc_fd, sm->sm_data, s->ths_channel);
+      mux = mux_create(hc->hc_fd, sm->sm_data, s->ths_channel, mc);
       break;
     }
     case SMT_STOP:
@@ -226,8 +227,10 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq, th_subscription_t 
     streaming_msg_free(sm);
   }
 
-  if(mkm)
-    mk_mux_close(mkm);
+  if(mux) {
+    mux_close(mux);
+    mux_destroy(mux);
+  }
 }
 
 /**
@@ -371,6 +374,11 @@ http_stream_service(http_connection_t *hc, service_t *service)
 
   streaming_queue_init(&sq, 0);
   gh = globalheaders_create(&sq.sq_st);
+
+  mux_container_type_t mc = mux_container_txt2type(http_arg_get(&hc->hc_req_args, "mux"));
+  if(mc == MC_UNKNOWN)
+    mc = MC_MATROSKA;
+
 #ifdef CONFIG_TRANSCODER
   streaming_target_t *tr = NULL;
   int transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
@@ -406,7 +414,7 @@ http_stream_service(http_connection_t *hc, service_t *service)
   pthread_mutex_unlock(&global_lock);
 
   if(s) {
-    http_stream_run(hc, &sq, s);
+    http_stream_run(hc, &sq, s, mc);
     pthread_mutex_lock(&global_lock);
     subscription_unsubscribe(s);
     pthread_mutex_unlock(&global_lock);
@@ -433,6 +441,11 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
 
   streaming_queue_init(&sq, 0);
   gh = globalheaders_create(&sq.sq_st);
+
+  mux_container_type_t mc = mux_container_txt2type(http_arg_get(&hc->hc_req_args, "mux"));
+  if(mc == MC_UNKNOWN)
+    mc = MC_MATROSKA;
+
 #ifdef CONFIG_TRANSCODER
   streaming_target_t *tr = NULL;
   int transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
@@ -467,7 +480,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   pthread_mutex_unlock(&global_lock);
 
   if(s) {
-    http_stream_run(hc, &sq, s);
+    http_stream_run(hc, &sq, s, mc);
     pthread_mutex_lock(&global_lock);
     subscription_unsubscribe(s);
     pthread_mutex_unlock(&global_lock);

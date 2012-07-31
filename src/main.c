@@ -35,6 +35,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include <libavformat/avformat.h>
+
 #include "tvheadend.h"
 #include "tcp.h"
 #include "access.h"
@@ -367,6 +369,8 @@ main(int argc, char **argv)
   /**
    * Initialize subsystems
    */
+  av_register_all();  
+
   xmltv_init();   /* Must be initialized before channels */
 
   service_init();
