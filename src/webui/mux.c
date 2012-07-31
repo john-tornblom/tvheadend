@@ -245,6 +245,7 @@ mux_create(int fd, const struct streaming_start *ss,
 
   if(avformat_write_header(oc, NULL) < 0) {
     tvhlog(LOG_WARNING, "mux",  "Failed to write %s header", mux_name);
+    mux->errors++;
   }
 
   return mux;
