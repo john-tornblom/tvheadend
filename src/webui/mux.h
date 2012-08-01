@@ -40,6 +40,7 @@ typedef struct mux {
   AVFormatContext *oc; // Output format
   AVIOContext *pb; // Buffer for muxer
   int errors; //number of weite errors on socket
+  mux_container_type_t mux_type;
 } mux_t;
 
 const char *mux_container_type2txt(mux_container_type_t mc);

@@ -225,6 +225,7 @@ mux_create(int fd, const struct streaming_start *ss,
   mux = calloc(1, sizeof(mux_t));
   mux->fd = fd;
   mux->oc = oc;
+  mux->mux_type = mc;
 
   for(i=0; i < ss->ss_num_components; i++) {
     ssc = &ss->ss_components[i];
@@ -280,9 +281,16 @@ mux_write_pkt(mux_t *mux, struct th_pkt *pkt)
     packet.data = pktbuf_ptr(pkt->pkt_payload);
     packet.size = pktbuf_len(pkt->pkt_payload);
     packet.stream_index = st->index;
-    packet.pts = ts_rescale(pkt->pkt_pts, 1000);
-    packet.dts = ts_rescale(pkt->pkt_dts, 1000);
-    packet.duration = ts_rescale(pkt->pkt_duration, 1000);
+
+    if(mux->mux_type != MC_MPEGTS) {
+      packet.pts = ts_rescale(pkt->pkt_pts, 1000);
+      packet.dts = ts_rescale(pkt->pkt_dts, 1000);
+      packet.duration = ts_rescale(pkt->pkt_duration, 1000);
+    } else {
+      packet.pts = pkt->pkt_pts;
+      packet.dts = pkt->pkt_dts;
+      packet.duration = pkt->pkt_duration;
+    }
 
     if(pkt->pkt_frametype < PKT_P_FRAME)
       packet.flags |= AV_PKT_FLAG_KEY;
