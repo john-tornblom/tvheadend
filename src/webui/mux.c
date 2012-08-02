@@ -212,15 +212,21 @@ mux_create(int fd, const struct streaming_start *ss,
   mux_t *mux;
   AVFormatContext *oc;
   AVIOContext *pb;
+  AVOutputFormat *fmt;
   uint8_t *buf;
   const streaming_start_component_t *ssc;
 
   mux_name = mux_container_type2txt(mc);
 
-  if(avformat_alloc_output_context2(&oc, NULL, mux_name, NULL) < 0) {
-    tvhlog(LOG_ERR, "mux",  "Can't allocate output context with format '%s'", mux_name);
+
+  fmt = av_guess_format(mux_name, NULL, NULL);
+  if(!fmt) {
+    tvhlog(LOG_ERR, "mux",  "Can't find the '%s' muxer", mux_name);
     return NULL;
   }
+
+  oc = avformat_alloc_context();
+  oc->oformat = fmt;
 
   mux = calloc(1, sizeof(mux_t));
   mux->fd = fd;
