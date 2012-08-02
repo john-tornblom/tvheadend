@@ -24,6 +24,11 @@
 #include "htsmsg.h"
 
 
+#define DVB_VER_INT(maj,min) (((maj) << 16) + (min))
+
+#define DVB_VER_ATLEAST(maj, min) \
+ (DVB_VER_INT(DVB_API_VERSION,  DVB_API_VERSION_MINOR) >= DVB_VER_INT(maj, min))
+
 TAILQ_HEAD(th_dvb_adapter_queue, th_dvb_adapter);
 RB_HEAD(th_dvb_mux_instance_tree, th_dvb_mux_instance);
 TAILQ_HEAD(th_dvb_mux_instance_queue, th_dvb_mux_instance);
@@ -130,10 +135,10 @@ typedef struct th_dvb_mux_instance {
 
   struct service_list tdmi_transports; /* via s_mux_link */
 
-
   TAILQ_ENTRY(th_dvb_mux_instance) tdmi_scan_link;
   struct th_dvb_mux_instance_queue *tdmi_scan_queue;
 
+  TAILQ_HEAD(, epggrab_ota_mux) tdmi_epg_grab;
 
 } th_dvb_mux_instance_t;
 
@@ -143,19 +148,25 @@ typedef struct th_dvb_mux_instance {
  */
 #define TDA_MUX_HASH_WIDTH 101
 
+#define TDA_SCANQ_BAD  0 ///< Bad muxes (monitor quality)
+#define TDA_SCANQ_OK   1 ///< OK muxes
+#define TDA_SCANQ_NUM  2
+
 typedef struct th_dvb_adapter {
 
   TAILQ_ENTRY(th_dvb_adapter) tda_global_link;
 
   struct th_dvb_mux_instance_list tda_muxes;
 
-  struct th_dvb_mux_instance_queue tda_scan_queues[2];
+  struct th_dvb_mux_instance_queue tda_scan_queues[TDA_SCANQ_NUM];
   int tda_scan_selector;
 
   struct th_dvb_mux_instance_queue tda_initial_scan_queue;
   int tda_initial_num_mux;
 
   th_dvb_mux_instance_t *tda_mux_current;
+
+  th_dvb_mux_instance_t *tda_mux_epg;
 
   int tda_table_epollfd;
 
@@ -206,6 +217,8 @@ typedef struct th_dvb_adapter {
 			  * return dela values */
 
   uint32_t tda_extrapriority; // extra priority for choosing the best adapter/service
+
+  uint32_t tda_skip_initialscan; // skip the initial scan
 
 } th_dvb_adapter_t;
 
@@ -266,6 +279,8 @@ void dvb_adapter_mux_scanner(void *aux);
 void dvb_adapter_set_displayname(th_dvb_adapter_t *tda, const char *s);
 
 void dvb_adapter_set_auto_discovery(th_dvb_adapter_t *tda, int on);
+
+void dvb_adapter_set_skip_initialscan(th_dvb_adapter_t *tda, int on);
 
 void dvb_adapter_set_idlescan(th_dvb_adapter_t *tda, int on);
 
@@ -343,6 +358,8 @@ const char *dvb_mux_add_by_params(th_dvb_adapter_t *tda,
 int dvb_mux_copy(th_dvb_adapter_t *dst, th_dvb_mux_instance_t *tdmi_src,
 		 dvb_satconf_t *satconf);
 
+void dvb_mux_add_to_scan_queue (th_dvb_mux_instance_t *tdmi);
+
 /**
  * DVB Transport (aka DVB service)
  */
@@ -384,7 +401,8 @@ tdt_add(th_dvb_mux_instance_t *tdmi, struct dmx_sct_filter_params *fparams,
 
 #define TDT_CRC           0x1
 #define TDT_QUICKREQ      0x2
-#define TDT_CA		  0x4
+#define TDT_CA		        0x4
+#define TDT_TDT           0x8
 
 /**
  * Satellite configuration

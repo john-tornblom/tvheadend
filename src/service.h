@@ -557,6 +557,8 @@ const char *service_nicename(service_t *t);
 
 const char *service_component_nicename(elementary_stream_t *st);
 
+const char *service_adapter_nicename(service_t *t);
+
 const char *service_tss2text(int flags);
 
 static inline int service_tss_is_error(int flags)
@@ -573,5 +575,7 @@ uint16_t service_get_encryption(service_t *t);
 void service_set_dvb_default_charset(service_t *t, const char *dvb_default_charset);
 
 void service_set_dvb_eit_enable(service_t *t, int dvb_eit_enable);
+
+int service_is_primary_epg (service_t *t);
 
 #endif // SERVICE_H__

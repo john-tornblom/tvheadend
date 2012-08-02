@@ -41,6 +41,7 @@
 #include "tsdemux.h"
 #include "notify.h"
 #include "service.h"
+#include "epggrab.h"
 
 struct th_dvb_adapter_queue dvb_adapters;
 struct th_dvb_mux_instance_tree dvb_muxes;
@@ -53,11 +54,12 @@ static void *dvb_adapter_input_dvr(void *aux);
 static th_dvb_adapter_t *
 tda_alloc(void)
 {
+  int i;
   th_dvb_adapter_t *tda = calloc(1, sizeof(th_dvb_adapter_t));
   pthread_mutex_init(&tda->tda_delivery_mutex, NULL);
 
-  TAILQ_INIT(&tda->tda_scan_queues[0]);
-  TAILQ_INIT(&tda->tda_scan_queues[1]);
+  for (i = 0; i < TDA_SCANQ_NUM; i++ )
+    TAILQ_INIT(&tda->tda_scan_queues[i]);
   TAILQ_INIT(&tda->tda_initial_scan_queue);
   TAILQ_INIT(&tda->tda_satconfs);
 
@@ -87,6 +89,7 @@ tda_save(th_dvb_adapter_t *tda)
   htsmsg_add_u32(m, "nitoid", tda->tda_nitoid);
   htsmsg_add_u32(m, "diseqc_version", tda->tda_diseqc_version);
   htsmsg_add_u32(m, "extrapriority", tda->tda_extrapriority);
+  htsmsg_add_u32(m, "skip_initialscan", tda->tda_skip_initialscan);
   hts_settings_save(m, "dvbadapters/%s", tda->tda_identifier);
   htsmsg_destroy(m);
 }
@@ -130,6 +133,25 @@ dvb_adapter_set_auto_discovery(th_dvb_adapter_t *tda, int on)
 	 tda->tda_displayname, on ? "On" : "Off");
 
   tda->tda_autodiscovery = on;
+  tda_save(tda);
+}
+
+
+/**
+ *
+ */
+void
+dvb_adapter_set_skip_initialscan(th_dvb_adapter_t *tda, int on)
+{
+  if(tda->tda_skip_initialscan == on)
+    return;
+
+  lock_assert(&global_lock);
+
+  tvhlog(LOG_NOTICE, "dvb", "Adapter \"%s\" skip initial scan set to: %s",
+	 tda->tda_displayname, on ? "On" : "Off");
+
+  tda->tda_skip_initialscan = on;
   tda_save(tda);
 }
 
@@ -402,6 +424,7 @@ dvb_adapter_init(uint32_t adapter_mask)
       htsmsg_get_u32(c, "nitoid", &tda->tda_nitoid);
       htsmsg_get_u32(c, "diseqc_version", &tda->tda_diseqc_version);
       htsmsg_get_u32(c, "extrapriority", &tda->tda_extrapriority);
+      htsmsg_get_u32(c, "skip_initialscan", &tda->tda_skip_initialscan);
     }
     htsmsg_destroy(l);
   }
@@ -421,10 +444,12 @@ dvb_adapter_mux_scanner(void *aux)
   th_dvb_adapter_t *tda = aux;
   th_dvb_mux_instance_t *tdmi;
   int i;
+  int idle_epg;
 
   if(tda->tda_rootpath == NULL)
     return; // No hardware
 
+  // default period
   gtimer_arm(&tda->tda_mux_scanner_timer, dvb_adapter_mux_scanner, tda, 20);
 
   if(LIST_FIRST(&tda->tda_muxes) == NULL)
@@ -439,8 +464,19 @@ dvb_adapter_mux_scanner(void *aux)
     return;
   }
 
-  if(!tda->tda_idlescan && TAILQ_FIRST(&tda->tda_scan_queues[0]) == NULL) {
-    /* Idlescan is disabled and no muxes are bad */
+  /* Check EPG */
+  if (tda->tda_mux_epg) {
+    epggrab_mux_stop(tda->tda_mux_epg, 1); // timeout anything not complete
+    tda->tda_mux_epg = NULL; // skip this time
+  } else {
+    tda->tda_mux_epg = epggrab_mux_next(tda);
+  }
+
+  /* Idle or EPG scan enabled */
+  idle_epg = tda->tda_idlescan || tda->tda_mux_epg;
+
+  /* Idlescan is disabled and no muxes are bad */
+  if(!idle_epg && TAILQ_FIRST(&tda->tda_scan_queues[TDA_SCANQ_BAD]) == NULL) {
 
     if(!tda->tda_qmon)
       return; // Quality monitoring is disabled
@@ -452,13 +488,27 @@ dvb_adapter_mux_scanner(void *aux)
       return;
   }
 
-  /* Alternate between the other two (bad and OK) */
-  for(i = 0; i < 2; i++) {
-    tda->tda_scan_selector = !tda->tda_scan_selector;
-    tdmi = TAILQ_FIRST(&tda->tda_scan_queues[tda->tda_scan_selector]);
-    if(tdmi != NULL) {
-      dvb_fe_tune(tdmi, "Autoscan");
-      return;
+  /* EPG */
+  if (tda->tda_mux_epg) {
+    int period = epggrab_mux_period(tda->tda_mux_epg);
+    if (period > 20)
+      gtimer_arm(&tda->tda_mux_scanner_timer,
+                 dvb_adapter_mux_scanner, tda, period);
+    dvb_fe_tune(tda->tda_mux_epg, "EPG scan");
+
+  /* Normal */
+  } else {
+
+    /* Alternate queue */
+    for(i = 0; i < TDA_SCANQ_NUM; i++) {
+      tda->tda_scan_selector++;
+      if (tda->tda_scan_selector == TDA_SCANQ_NUM)
+        tda->tda_scan_selector = 0;
+      tdmi = TAILQ_FIRST(&tda->tda_scan_queues[tda->tda_scan_selector]);
+      if (tdmi) {
+        dvb_fe_tune(tdmi, "Autoscan");
+        return;
+      }
     }
   }
 }

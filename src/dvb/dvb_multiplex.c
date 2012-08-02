@@ -44,6 +44,7 @@
 #include "dvb_support.h"
 #include "notify.h"
 #include "subscriptions.h"
+#include "epggrab.h"
 
 struct th_dvb_mux_instance_tree dvb_muxes;
 
@@ -248,7 +249,7 @@ dvb_mux_create(th_dvb_adapter_t *tda, const struct dvb_mux_conf *dmc,
     return NULL;
   }
 
-
+  TAILQ_INIT(&tdmi->tdmi_epg_grab);
 
   tdmi->tdmi_enabled = enabled;
   
@@ -258,7 +259,6 @@ dvb_mux_create(th_dvb_adapter_t *tda, const struct dvb_mux_conf *dmc,
   tdmi->tdmi_adapter = tda;
   tdmi->tdmi_network = network ? strdup(network) : NULL;
   tdmi->tdmi_quality = 100;
-
 
   memcpy(&tdmi->tdmi_conf, dmc, sizeof(struct dvb_mux_conf));
   if(satconf)
@@ -286,6 +286,8 @@ dvb_mux_create(th_dvb_adapter_t *tda, const struct dvb_mux_conf *dmc,
     tda->tda_initial_num_mux++;
     tdmi->tdmi_table_initial = 1;
     mux_link_initial(tda, tdmi);
+  } else {
+    dvb_mux_add_to_scan_queue(tdmi);
   }
 
   return tdmi;
@@ -329,6 +331,8 @@ dvb_mux_destroy(th_dvb_mux_instance_t *tdmi)
 
   if(tdmi->tdmi_table_initial)
     tda->tda_initial_num_mux--;
+
+  epggrab_mux_delete(tdmi);
 
   hts_settings_remove("dvbmuxes/%s", tdmi->tdmi_identifier);
 
@@ -424,13 +428,23 @@ static struct strtab bwtab[] = {
   { "8MHz", BANDWIDTH_8_MHZ },
   { "7MHz", BANDWIDTH_7_MHZ },
   { "6MHz", BANDWIDTH_6_MHZ },
-  { "AUTO", BANDWIDTH_AUTO }
+  { "AUTO", BANDWIDTH_AUTO },
+#if DVB_VER_ATLEAST(5,3)
+  { "5MHz", BANDWIDTH_5_MHZ },
+  { "10MHz", BANDWIDTH_10_MHZ },
+  { "1712kHz", BANDWIDTH_1_712_MHZ},
+#endif
 };
 
 static struct strtab modetab[] = {
   { "2k",   TRANSMISSION_MODE_2K },
   { "8k",   TRANSMISSION_MODE_8K },
-  { "AUTO", TRANSMISSION_MODE_AUTO }
+  { "AUTO", TRANSMISSION_MODE_AUTO },
+#if DVB_VER_ATLEAST(5,3)
+  { "1k",   TRANSMISSION_MODE_1K },
+  { "2k",   TRANSMISSION_MODE_16K },
+  { "32k",  TRANSMISSION_MODE_32K },
+#endif
 };
 
 static struct strtab guardtab[] = {
@@ -439,6 +453,11 @@ static struct strtab guardtab[] = {
   { "1/8",  GUARD_INTERVAL_1_8 },
   { "1/4",  GUARD_INTERVAL_1_4 },
   { "AUTO", GUARD_INTERVAL_AUTO },
+#if DVB_VER_ATLEAST(5,3)
+  { "1/128", GUARD_INTERVAL_1_128 },
+  { "19/128", GUARD_INTERVAL_19_128 },
+  { "19/256", GUARD_INTERVAL_19_256},
+#endif
 };
 
 static struct strtab hiertab[] = {
@@ -505,6 +524,8 @@ dvb_mux_save(th_dvb_mux_instance_t *tdmi)
     htsmsg_add_str(m, "network", tdmi->tdmi_network);
 
   htsmsg_add_u32(m, "frequency", f->frequency);
+
+  htsmsg_add_u32(m, "initialscan", tdmi->tdmi_table_initial);
 
   switch(tdmi->tdmi_adapter->tda_type) {
   case FE_OFDM:
@@ -586,7 +607,7 @@ tdmi_create_by_msg(th_dvb_adapter_t *tda, htsmsg_t *m, const char *identifier)
   struct dvb_mux_conf dmc;
   const char *s;
   int r;
-  unsigned int tsid, u32, enabled;
+  unsigned int tsid, u32, enabled, initscan;
 
   memset(&dmc, 0, sizeof(dmc));
   
@@ -710,8 +731,13 @@ tdmi_create_by_msg(th_dvb_adapter_t *tda, htsmsg_t *m, const char *identifier)
   else
     dmc.dmc_satconf = NULL;
 
+  initscan = htsmsg_get_u32_or_default(m, "initialscan", 1);
+  if (!initscan && !tda->tda_skip_initialscan)
+    initscan = 1;
+
   tdmi = dvb_mux_create(tda, &dmc,
-			tsid, htsmsg_get_str(m, "network"), NULL, enabled, 1,
+			tsid, htsmsg_get_str(m, "network"), NULL, enabled,
+      initscan,
 			identifier, NULL);
   if(tdmi != NULL) {
 
@@ -1146,4 +1172,14 @@ dvb_mux_copy(th_dvb_adapter_t *dst, th_dvb_mux_instance_t *tdmi_src,
   }
   dvb_mux_save(tdmi_dst);
   return 0;
+}
+
+void dvb_mux_add_to_scan_queue ( th_dvb_mux_instance_t *tdmi )
+{
+  int ti;
+  th_dvb_adapter_t *tda = tdmi->tdmi_adapter;
+  ti = tdmi->tdmi_quality == 100 ? TDA_SCANQ_OK
+                                 : TDA_SCANQ_BAD;
+  tdmi->tdmi_scan_queue = &tda->tda_scan_queues[ti];
+  TAILQ_INSERT_TAIL(tdmi->tdmi_scan_queue, tdmi, tdmi_scan_link);
 }

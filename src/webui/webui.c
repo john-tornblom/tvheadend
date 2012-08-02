@@ -40,6 +40,7 @@
 #include "plumbing/tsfix.h"
 #include "plumbing/globalheaders.h"
 #include "plumbing/transcode.h"
+#include "epg.h"
 
 struct filebundle *filebundles;
 
@@ -183,12 +184,11 @@ http_stream_run(http_connection_t *hc, streaming_queue_t *sq,
       run = !mux_write_pkt(mux, sm->sm_data);
       sm->sm_data = NULL;
 
-      event_t *e = NULL;
-      if(s->ths_channel)
-	e = s->ths_channel->ch_epg_current;
+      epg_broadcast_t *e = NULL;
+      if(s->ths_channel) e = s->ths_channel->ch_epg_now;
 
-      if(e && event_id != e->e_id) {
-	event_id = e->e_id;
+      if(e && event_id != e->id) {
+	event_id = e->id;
 	run = !mux_write_meta(mux, e);
       }
       break;

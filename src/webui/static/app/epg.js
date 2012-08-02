@@ -1,25 +1,48 @@
+tvheadend.brands = new Ext.data.JsonStore({
+  root: 'entries',
+  fields: [ 'uri', 'title' ],
+  autoLoad: true,
+  url : 'epgobject',
+  baseParams : { op : 'brandList' }
+});
+// WIBNI: might want this store to periodically update
+
 tvheadend.ContentGroupStore = new Ext.data.JsonStore({
     root:'entries',
-    fields: [{name: 'name'}],
+    fields: ['name', 'code'],
     autoLoad: true,
     url:'ecglist'
 });
 
-tvheadend.ContentGroupStore.setDefaultSort('name', 'ASC');
+tvheadend.contentGroupLookupName = function(code)
+{
+  ret = "";
+  tvheadend.ContentGroupStore.each(function(r)
+  {
+    if      (r.data.code == code)
+      ret = r.data.name;
+    else if (ret == "" && r.data.code == code & 0xF0)
+      ret = r.data.name;
+  });
+  return ret;
+}
+
+tvheadend.ContentGroupStore.setDefaultSort('code', 'ASC');
 
 tvheadend.epgDetails = function(event) {
-
 
     var content = '';
     
     if(event.chicon != null && event.chicon.length > 0)
 	content += '<img class="x-epg-chicon" src="' + event.chicon + '">';
 
-    content += '<div class="x-epg-title">' + event.title + '</div>';
+    content += '<div class="x-epg-title">' + event.title;
+    if (event.subtitle) content += "&nbsp;:&nbsp;" + event.subtitle;
+    content += '</div>';
     content += '<div class="x-epg-desc">' + event.episode + '</div>';
     content += '<div class="x-epg-desc">' + event.description + '</div>';
 
-    content += '<div class="x-epg-meta">' + event.contentgrp + '</div>';
+    content += '<div class="x-epg-meta">' + tvheadend.contentGroupLookupName(event.contenttype) + '</div>';
 
     if(event.ext_desc != null)
       content += '<div class="x-epg-meta">' + event.ext_desc + '</div>';
@@ -40,6 +63,9 @@ tvheadend.epgDetails = function(event) {
             event.channelid + "')\">Play</a>" + "</div>";
     }
 
+    content += '<div id="related"></div>';
+    content += '<div id="altbcast"></div>';
+
     var confcombo = new Ext.form.ComboBox({
         store: tvheadend.configNames,
         triggerAction: 'all',
@@ -56,7 +82,7 @@ tvheadend.epgDetails = function(event) {
 	title: event.title,
 	bodyStyle: 'margin: 5px',
         layout: 'fit',
-        width: 400,
+        width: 500,
         height: 300,
 	constrainHeader: true,
 	buttons: [
@@ -64,20 +90,31 @@ tvheadend.epgDetails = function(event) {
 	    new Ext.Button({
 		handler: recordEvent,
 		text: "Record program"
-	    })
+	    }),
+    new Ext.Button({
+      handler: recordSeries,
+      text: "Record series"
+    })
 	],
 	buttonAlign: 'center',
 	html: content
     });
     win.show();
 
-
     function recordEvent() {
+      record('recordEvent');
+    }
+
+    function recordSeries() {
+      record('recordSeries');
+    }
+
+    function record(op) {
 	Ext.Ajax.request({
 	    url: 'dvr',
 	    params: {
                 eventId: event.id, 
-                op: 'recordEvent', 
+                op: op,
                 config_name: confcombo.getValue()
             },
 
@@ -91,6 +128,55 @@ tvheadend.epgDetails = function(event) {
 	});
     }
 
+    function showAlternatives (s) {
+      var e = Ext.get('altbcast')
+      html = '';
+      if ( s.getTotalCount() > 0 ) {
+        html += '<div class="x-epg-subtitle">Alternative Broadcasts</div>';
+        for ( i = 0; i < s.getTotalCount(); i++ ) {
+          var ab = s.getAt(i).data;
+  	      var dt = Date.parseDate(ab.start, 'U');
+          html += '<div class="x-epg-desc">' + dt.format('l H:i') + '&nbsp;&nbsp;&nbsp;' + ab.channel + '</div>';
+        }
+      }
+      e.dom.innerHTML = html;
+    }
+    function showRelated (s)
+    {
+      var e = Ext.get('related')
+      html = '';
+      if ( s.getTotalCount() > 0 ) {
+        html += '<div class="x-epg-subtitle">Related Episodes</div>';
+        for ( i = 0; i < s.getTotalCount(); i++ ) {
+          var ee = s.getAt(i).data;
+          html += '<div class="x-epg-desc">';
+          if (ee.episode) html += ee.episode + '&nbsp;&nbsp;&nbsp;';
+          html += ee.title;
+          if (ee.subtitle) html += ' : ' + ee.subtitle
+          html += '</div>';
+        }
+      }
+      e.dom.innerHTML = html;
+    }
+
+    var ab = new Ext.data.JsonStore({
+      root: 'entries',
+      url:  'epgrelated',
+      autoLoad: true,
+      id: 'id',
+      baseParams: { op: 'get', id: event.id, type: 'alternative' },
+      fields: Ext.data.Record.create([ 'id', 'channel', 'start' ]),
+      listeners: { 'datachanged': showAlternatives}
+    });
+    var re = new Ext.data.JsonStore({
+      root: 'entries',
+      url:  'epgrelated',
+      autoLoad: true,
+      id: 'uri',
+      baseParams: { op: 'get', id: event.id, type: 'related' },
+      fields: Ext.data.Record.create([ 'uri', 'title', 'subtitle', 'episode']),
+      listeners: { 'datachanged': showRelated}
+    });
 }
 
 
@@ -112,6 +198,7 @@ tvheadend.epg = function() {
         ]
     });
 
+
     var epgStore = new Ext.ux.grid.livegrid.Store({
 	autoLoad: true,
 	url: 'epg',
@@ -125,16 +212,14 @@ tvheadend.epg = function() {
 	    {name: 'channel'},
 	    {name: 'channelid'},
 	    {name: 'title'},
+	    {name: 'subtitle'},
 	    {name: 'episode'},
 	    {name: 'description'},
-	    {name: 'ext_desc'},
-	    {name: 'ext_item'},
-	    {name: 'ext_text'},
 	    {name: 'chicon'},
             {name: 'start', type: 'date', dateFormat: 'U' /* unix time */},
             {name: 'end', type: 'date', dateFormat: 'U' /* unix time */},
             {name: 'duration'},
-	    {name: 'contentgrp'},
+	    {name: 'contenttype'},
 	    {name: 'schedstate'}
 	])
    });
@@ -188,6 +273,12 @@ tvheadend.epg = function() {
 	    dataIndex: 'title',
 	    renderer: renderText
 	},{
+	    width: 250,
+	    id:'subtitle',
+	    header: "SubTitle",
+	    dataIndex: 'subtitle',
+	    renderer: renderText
+	},{
 	    width: 100,
 	    id:'episode',
 	    header: "Episode",
@@ -220,10 +311,12 @@ tvheadend.epg = function() {
 	    renderer: renderText
 	},{
 	    width: 250,
-	    id:'contentgrp',
+	    id:'contenttype',
 	    header: "Content Type",
-	    dataIndex: 'contentgrp',
-	    renderer: renderText
+	    dataIndex: 'contenttype',
+	    renderer: function(v) {
+        return tvheadend.contentGroupLookupName(v);
+      }
 	}
     ]);
 
@@ -279,7 +372,7 @@ tvheadend.epg = function() {
     function epgQueryClear() {
 	epgStore.baseParams.channel    = null;
 	epgStore.baseParams.tag        = null;
-	epgStore.baseParams.contentgrp = null;
+	epgStore.baseParams.contenttype = null;
 	epgStore.baseParams.title      = null;
 
 	epgFilterChannels.setValue("");
@@ -305,8 +398,8 @@ tvheadend.epg = function() {
     });
 
     epgFilterContentGroup.on('select', function(c, r) {
-	if(epgStore.baseParams.contentgrp != r.data.name) {
-	    epgStore.baseParams.contentgrp = r.data.name;
+	if(epgStore.baseParams.contenttype != r.data.code) {
+	    epgStore.baseParams.contenttype = r.data.code;
 	    epgStore.reload();
 	}
     });
@@ -399,8 +492,8 @@ tvheadend.epg = function() {
 	    epgStore.baseParams.channel    : "<i>Don't care</i>";
 	var tag = epgStore.baseParams.tag ?
 	    epgStore.baseParams.tag        : "<i>Don't care</i>";
-	var contentgrp = epgStore.baseParams.contentgrp ?
-	    epgStore.baseParams.contentgrp : "<i>Don't care</i>";
+	var contenttype = epgStore.baseParams.contenttype ?
+	    epgStore.baseParams.contenttype : "<i>Don't care</i>";
 
 	Ext.MessageBox.confirm('Auto Recorder',
 			       'This will create an automatic rule that ' +
@@ -410,7 +503,7 @@ tvheadend.epg = function() {
 			       '<div class="x-smallhdr">Title:</div>' + title + '<br>' +
 			       '<div class="x-smallhdr">Channel:</div>' + channel + '<br>' +
 			       '<div class="x-smallhdr">Tag:</div>' + tag + '<br>' +
-			       '<div class="x-smallhdr">Content Group:</div>' + contentgrp + '<br>' +
+			       '<div class="x-smallhdr">Genre:</div>' + contenttype + '<br>' +
 			       '<br>' +
 			       'Currently this will match (and record) ' + 
 			       epgStore.getTotalCount() + ' events. ' +

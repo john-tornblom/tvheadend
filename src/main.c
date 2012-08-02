@@ -43,7 +43,7 @@
 #include "http.h"
 #include "webui/webui.h"
 #include "dvb/dvb.h"
-#include "xmltv.h"
+#include "epggrab.h"
 #include "spawn.h"
 #include "subscriptions.h"
 #include "serviceprobe.h"
@@ -86,6 +86,21 @@ doexit(int x)
   running = 0;
 }
 
+static int
+get_user_groups (const struct passwd *pw, gid_t* glist, size_t gmax)
+{
+  int num = 0;
+  struct group *gr;
+  char **mem;
+  glist[num++] = pw->pw_gid;
+  for ( gr = getgrent(); (gr != NULL) && (num < gmax); gr = getgrent() ) {
+    if (gr->gr_gid == pw->pw_gid) continue;
+    for (mem = gr->gr_mem; *mem; mem++) {
+      if(!strcmp(*mem, pw->pw_name)) glist[num++] = gr->gr_gid;
+    }
+  }
+  return num;
+}
 
 /**
  *
@@ -311,11 +326,9 @@ main(int argc, char **argv)
 
   signal(SIGPIPE, handle_sigpipe);
 
-  grp = getgrnam(groupnam ?: "video");
-  pw = usernam ? getpwnam(usernam) : NULL;
-
-
   if(forkaway) {
+    grp  = getgrnam(groupnam ?: "video");
+    pw   = usernam ? getpwnam(usernam) : NULL;
 
     if(daemon(0, 0)) {
       exit(2);
@@ -326,22 +339,22 @@ main(int argc, char **argv)
       fclose(pidfile);
     }
 
-   if(grp != NULL) {
+    if(grp != NULL) {
       setgid(grp->gr_gid);
     } else {
       setgid(1);
     }
 
-   if(pw != NULL) {
+    if (pw != NULL) {
+      gid_t glist[10];
+      int gnum = get_user_groups(pw, glist, 10);
+      setgroups(gnum, glist);
       setuid(pw->pw_uid);
+      homedir = pw->pw_dir;
+      setenv("HOME", homedir, 1);
     } else {
       setuid(1);
     }
-
-   if(pw != NULL) {
-     homedir = pw->pw_dir;
-     setenv("HOME", homedir, 1);
-   }
 
     umask(0);
   }
@@ -371,8 +384,6 @@ main(int argc, char **argv)
    */
   av_register_all();  
 
-  xmltv_init();   /* Must be initialized before channels */
-
   service_init();
 
   channels_init();
@@ -400,6 +411,7 @@ main(int argc, char **argv)
 
   capmt_init();
 
+  epggrab_init();
   epg_init();
 
   dvr_init();
@@ -417,6 +429,8 @@ main(int argc, char **argv)
 #ifdef CONFIG_AVAHI
   avahi_init();
 #endif
+
+  epg_updated(); // cleanup now all prev ref's should have been created
 
   pthread_mutex_unlock(&global_lock);
 
@@ -492,14 +506,17 @@ tvhlogv(int notify, int severity, const char *subsys, const char *fmt,
     syslog(severity, "%s", buf);
 
   /**
+   * Get time (string)
+   */
+  time(&now);
+  localtime_r(&now, &tm);
+  strftime(t, sizeof(t), "%b %d %H:%M:%S", &tm);
+
+  /**
    * Send notification to Comet (Push interface to web-clients)
    */
   if(notify) {
     htsmsg_t *m;
-
-    time(&now);
-    localtime_r(&now, &tm);
-    strftime(t, sizeof(t), "%b %d %H:%M:%S", &tm);
 
     snprintf(buf2, sizeof(buf2), "%s %s", t, buf);
     m = htsmsg_create_map();
@@ -524,7 +541,7 @@ tvhlogv(int notify, int severity, const char *subsys, const char *fmt,
     } else {
       sgroff = "\033[0m";
     }
-    fprintf(stderr, "%s[%s]:%s%s\n", sgr, leveltxt, buf, sgroff);
+    fprintf(stderr, "%s%s [%s]:%s%s\n", sgr, t, leveltxt, buf, sgroff);
   }
 }
 
