@@ -187,7 +187,7 @@ mux_support_stream(mux_container_type_t mc,
     ret |= (type == SCT_MPEG2AUDIO);
     ret |= (type == SCT_H264);
     ret |= (type == SCT_AC3);
-    ret |= (type == SCT_TELETEXT);
+    //ret |= (type == SCT_TELETEXT); //missing pts on some pids?
     ret |= (type == SCT_DVBSUB);
     ret |= (type == SCT_AAC);
     ret |= (type == SCT_EAC3);
