@@ -53,7 +53,7 @@ mux_create(int fd,
 	   mux_container_type_t mc);
 
 int mux_write_pkt(mux_t *mux, struct th_pkt *pkt);
-int mux_write_meta(mux_t *mux, event_t *e);
+int mux_write_meta(mux_t *mux, epg_broadcast_t *e);
 
 int mux_close(mux_t *mux);
 void mux_destroy(mux_t *mux);

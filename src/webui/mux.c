@@ -311,7 +311,7 @@ mux_write_pkt(mux_t *mux, struct th_pkt *pkt)
  * 
  */
 int
-mux_write_meta(mux_t *mux, event_t *e)
+mux_write_meta(mux_t *mux, epg_broadcast_t *e)
 {
   return mux->errors;
 }
