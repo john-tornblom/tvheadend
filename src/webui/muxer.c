@@ -142,8 +142,8 @@ muxer_create(int fd, struct service *s, muxer_container_type_t mc)
     m = pass_muxer_create(mc);
 
 #if ENABLE_LIBAV
-  if(!m)
-    m = lav_muxer_create(mc);
+  //if(!m)
+  //m = lav_muxer_create(mc);
 #endif
 
   if(!m)
