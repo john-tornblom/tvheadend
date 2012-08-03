@@ -61,6 +61,10 @@
 #include "settings.h"
 #include "ffdecsa/FFdecsa.h"
 
+#if ENABLE_LIBAV
+#include <libavformat/avformat.h>
+#endif
+
 int running;
 time_t dispatch_clock;
 static LIST_HEAD(, gtimer) gtimers;
@@ -390,6 +394,10 @@ main(int argc, char **argv)
 
   access_init(createdefault);
 
+#if ENABLE_LIBAV
+  av_register_all();
+#endif
+
   tcp_server_init();
 #if ENABLE_LINUXDVB
   dvb_init(adapter_mask);
@@ -398,7 +406,7 @@ main(int argc, char **argv)
 #if ENABLE_V4L
   v4l_init();
 #endif
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   transcoder_init();
 #endif
   http_server_init();

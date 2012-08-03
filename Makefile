@@ -130,10 +130,17 @@ ${BUILDDIR}/src/ffdecsa/ffdecsa_sse2.o : CFLAGS = -msse2
 #
 SRCS += src/webui/webui.c \
 	src/webui/comet.c \
-	src/webui/mux.c \
 	src/webui/extjs.c \
 	src/webui/simpleui.c \
 	src/webui/statedump.c \
+	src/webui/muxer.c \
+	src/webui/tvh_muxer.c \
+	src/webui/pass_muxer.c \
+
+#
+# libav dependent sources
+#
+SRCS-$(CONFIG_LIBAV) += src/webui/lav_muxer.c
 
 #
 # Extra modules
@@ -153,10 +160,7 @@ ${BUILDDIR}/src/avahi.o : CFLAGS = \
 # Transcoder
 #
 
-SRCS-$(CONFIG_TRANSCODER) += src/plumbing/transcode.c
-
-#${BUILDDIR}/src/plumbing/transcode.o : CFLAGS = \
-#                      $(shell pkg-config --cflags libavcode libcwscale) -Wall -Werror
+SRCS-$(CONFIG_LIBAV) += src/plumbing/transcode.c
 
 
 # Various transformations

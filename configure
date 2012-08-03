@@ -44,7 +44,7 @@ enable cwc
 enable avahi
 enable linuxdvb
 enable v4l
-enable transcoder
+enable libav
 
 for opt do
   optval="${opt#*=}"
@@ -186,14 +186,17 @@ else
     die
 fi
 
-if enabled transcoder; then
+#
+# HTTP Muxing
+#
+if enabled libav; then
     if pkg-config --atleast-version 52.96.0 libavcodec; then
 	echo >>${CONFIG_MAK} "LDFLAGS_cfg += " `pkg-config --libs libavcodec`
 	echo >>${CONFIG_MAK} "CFLAGS_cfg += " `pkg-config --cflags libavcodec`
 	echo "Using libavcodec:      `pkg-config --modversion libavcodec`"
     else
 	echo "libavcodec 52.96.0 or newer not found."
-	echo "To compile without it, configure with: --disable-transcoder"
+	echo "To compile without it, configure with: --disable-libav"
 	die
     fi
 
@@ -203,7 +206,7 @@ if enabled transcoder; then
 	echo "Using libavutil:       `pkg-config --modversion libavutil`"
     else
 	echo "libavutil 50.43.0 or newer not found."
-	echo "To compile without it, configure with: --disable-transcoder"
+	echo "To compile without it, configure with: --disable-libav"
 	die
     fi
 
@@ -213,7 +216,7 @@ if enabled transcoder; then
 	echo "Using libswscale:      `pkg-config --modversion libswscale`"
     else
 	echo "libswscale 0.13.0 or newer not found."
-	echo "To compile without it, configure with: --disable-transcoder"
+	echo "To compile without it, configure with: --disable-libav"
 	die
     fi
 
@@ -223,7 +226,7 @@ if enabled transcoder; then
         echo "Using libavformat:     `pkg-config --modversion libavformat`"
     else
         echo "libavformat 50.43.0 or newer not found."
-        echo "To compile without it, configure with: --disable-transcoder"
+        echo "To compile without it, configure with: --disable-libav"
         die
     fi
 fi

@@ -157,7 +157,7 @@ typedef struct htsp_subscription {
 
   streaming_target_t hs_input;
 
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   streaming_target_t *hs_transcoder;
   streaming_target_t *hs_tsfix;
 #endif
@@ -245,7 +245,7 @@ htsp_subscription_destroy(htsp_connection_t *htsp, htsp_subscription_t *hs)
 {
   LIST_REMOVE(hs, hs_link);
   subscription_unsubscribe(hs->hs_s);
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   if(hs->hs_transcoder != NULL)
     transcoder_destroy(hs->hs_transcoder);
   if(hs->hs_tsfix != NULL)
@@ -879,7 +879,7 @@ htsp_method_feedback(htsp_connection_t *htsp, htsmsg_t *in)
   if(htsmsg_get_u32(in, "speed", &speed))
     return htsp_error("Missing argument 'speed'");
   
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   if(s != NULL)
     transcoder_set_network_speed(s->hs_transcoder, speed);
 #endif
@@ -937,7 +937,7 @@ static htsmsg_t *
 htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 {
   uint32_t chid, sid, weight;
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   uint32_t max_resolution;
   streaming_component_type_t acodec, vcodec;
 #endif
@@ -955,7 +955,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
 
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   max_resolution = htsmsg_get_u32_or_default(in, "maxWidth", 0);
   vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
   acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
@@ -978,7 +978,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   LIST_INSERT_HEAD(&htsp->htsp_subscriptions, hs, hs_link);
   streaming_target_init(&hs->hs_input, htsp_streaming_input, hs, 0);
 
-#ifdef CONFIG_TRANSCODER
+#if ENABLE_LIBAV
   if(max_resolution) {
     hs->hs_transcoder = transcoder_create(&hs->hs_input, 
 					  max_resolution,
