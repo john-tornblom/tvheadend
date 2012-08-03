@@ -144,6 +144,12 @@ transcoder_get_codec_id(streaming_component_type_t type)
   case SCT_MPEG2AUDIO:
     codec_id = CODEC_ID_MP2;
     break;
+  case SCT_MPEG4VIDEO:
+    codec_id = CODEC_ID_MPEG4;
+    break;
+  case SCT_VP8:
+    codec_id = CODEC_ID_VP8;
+    break;
   default:
     codec_id = CODEC_ID_NONE;
     break;
@@ -466,21 +472,33 @@ transcoder_stream_video(transcoder_stream_t *ts, th_pkt_t *pkt)
       ts->tctx->global_quality = 10;
       ts->tctx->flags         |= CODEC_FLAG_GLOBAL_HEADER;
       break;
-      /*
-	case SCT_VP8:
-	ts->tctx->codec_id     = CODEC_ID_VP8;
-	ts->tctx->pix_fmt      = PIX_FMT_YUV420P;
-	//ts->tctx->flags     |= CODEC_FLAG_QSCALE;
-	ts->tctx->rc_lookahead = 1;
-	ts->tctx->max_b_frames = 1;
-	ts->tctx->qmin         = 1;
-	ts->tctx->qmax         = 63;
-	ts->tctx->bit_rate     = 250 * 1000;
-	ts->tctx->rc_min_rate  = ts->tctx->bit_rate;
-	ts->tctx->rc_max_rate  = ts->tctx->bit_rate;
-	ts->enc_frame->quality = 20;
-	break;
-      */
+    case SCT_MPEG4VIDEO:
+      ts->tctx->codec_id       = CODEC_ID_MPEG4;
+      ts->tctx->pix_fmt        = PIX_FMT_YUV420P;
+      //ts->tctx->flags         |= CODEC_FLAG_QSCALE;
+      ts->tctx->rc_lookahead   = 0;
+      ts->tctx->max_b_frames   = 0;
+      ts->tctx->qmin           = 1;
+      ts->tctx->qmax           = FF_LAMBDA_MAX;
+      ts->tctx->global_quality = 10;
+      ts->tctx->bit_rate       = 2 * ts->tctx->width * ts->tctx->height;
+      ts->tctx->flags         |= CODEC_FLAG_GLOBAL_HEADER;
+      break;
+      
+    case SCT_VP8:
+      ts->tctx->codec_id     = CODEC_ID_VP8;
+      ts->tctx->pix_fmt      = PIX_FMT_YUV420P;
+      //ts->tctx->flags     |= CODEC_FLAG_QSCALE;
+      ts->tctx->rc_lookahead = 1;
+      ts->tctx->max_b_frames = 1;
+      ts->tctx->qmin         = 1;
+      ts->tctx->qmax         = 63;
+      ts->tctx->bit_rate     = 8 * ts->tctx->width * ts->tctx->height;
+      ts->tctx->rc_min_rate  = ts->tctx->bit_rate;
+      ts->tctx->rc_max_rate  = ts->tctx->bit_rate;
+      ts->enc_frame->quality = 20;
+      break;
+
     case SCT_H264:
       ts->tctx->codec_id = CODEC_ID_H264;
       ts->tctx->pix_fmt  = PIX_FMT_YUV420P;

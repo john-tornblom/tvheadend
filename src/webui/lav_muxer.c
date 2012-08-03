@@ -46,6 +46,12 @@ lav_muxer_get_codec_id(streaming_component_type_t type)
   case SCT_MPEG2VIDEO:
     codec_id = CODEC_ID_MPEG2VIDEO;
     break;
+  case SCT_MPEG4VIDEO:
+    codec_id = CODEC_ID_MPEG4;
+    break;
+  case SCT_VP8:
+    codec_id = CODEC_ID_VP8;
+    break;
   case SCT_AC3:
     codec_id = CODEC_ID_AC3;
     break;

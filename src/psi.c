@@ -900,8 +900,10 @@ psi_caid2name(uint16_t caid)
  */
 static struct strtab streamtypetab[] = {
   { "MPEG2VIDEO", SCT_MPEG2VIDEO },
+  { "MPEG4VIDEO", SCT_MPEG4VIDEO },
   { "MPEG2AUDIO", SCT_MPEG2AUDIO },
   { "H264",       SCT_H264 },
+  { "VP8",        SCT_VP8 },
   { "AC3",        SCT_AC3 },
   { "TELETEXT",   SCT_TELETEXT },
   { "DVBSUB",     SCT_DVBSUB },
@@ -912,7 +914,7 @@ static struct strtab streamtypetab[] = {
   { "MPEGTS",     SCT_MPEGTS },
   { "TEXTSUB",    SCT_TEXTSUB },
   { "EAC3",       SCT_EAC3 },
-  { "AAC",       SCT_MP4A },
+  { "AAC",        SCT_MP4A },
 };
 
 

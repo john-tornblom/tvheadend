@@ -196,6 +196,16 @@ mk_build_tracks(mk_mux_t *mkm, const struct streaming_start *ss)
       mkm->tracks[i].merge = 1;
       break;
 
+    case SCT_MPEG4VIDEO:
+      tracktype = 1;
+      codec_id = "V_MPEG4/ISO/ASP";
+      break;
+
+    case SCT_VP8:
+      tracktype = 1;
+      codec_id = "V_VP8";
+      break;
+
     case SCT_H264:
       tracktype = 1;
       codec_id = "V_MPEG4/ISO/AVC";
