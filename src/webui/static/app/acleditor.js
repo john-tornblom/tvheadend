@@ -37,6 +37,12 @@ tvheadend.acleditor = function() {
 		width : 100
 	});
 
+	var transcodeColumn = new Ext.grid.CheckColumn({
+		header : "Transcode",
+		dataIndex : 'transcode',
+		width : 100
+	});
+
 	var cm = new Ext.grid.ColumnModel({
   defaultSortable: true,
   columns : [ enabledColumn, {
@@ -60,7 +66,73 @@ tvheadend.acleditor = function() {
 		editor : new fm.TextField({
 			allowBlank : false
 		})
-	}, streamingColumn, dvrColumn, dvrallcfgColumn, webuiColumn, adminColumn, {
+	}, streamingColumn, dvrColumn, dvrallcfgColumn, webuiColumn, adminColumn, transcodeColumn, {
+                header : "Resolution",
+                dataIndex : 'resolution',
+                width : 100,
+                editor : new fm.ComboBox({
+                  store: new Ext.data.SimpleStore({
+                    fields : [ 'key', 'value' ],
+                    data: [
+                      ['720','720p'],
+                      ['576','576p'],
+                      ['480','480p'],
+                      ['384','384p'],
+                      ['288','288p']
+                    ]
+                  }),
+                  displayField: 'value',
+                  valueField: 'key',
+                  typeAhead: true,
+                  mode: 'local',
+                  triggerAction: 'all',
+                  selectOnFocus: true
+                })
+        }, {
+                header : "VCodec",
+                dataIndex : 'vcodec',
+                width : 100,
+                editor : new fm.ComboBox({
+                  store: new Ext.data.SimpleStore({
+                    fields : [ 'key','value' ],
+                    data: [
+                      ['h264','h264'],
+                      ['vp8','vp8']
+                    ]
+                  }),
+                  displayField: 'key',
+                  valueField: 'value',
+                  typeAhead: true,
+                  mode: 'local',
+                  triggerAction: 'all',
+                  selectOnFocus: true
+                })
+        }, {
+                header : "ACodec",
+                dataIndex : 'acodec',
+                width : 100,
+                editor : new fm.ComboBox({
+                  store: new Ext.data.SimpleStore({
+                    fields : [ 'key','value' ],
+                    data: [ 
+                      ['aac','aac'],
+                      ['vorbis','vorbis'],
+                      ['ac3','ac3']
+                    ]
+                  }),
+                  displayField: 'key',
+                  valueField: 'value',
+                  typeAhead: true,
+                  mode: 'local',
+                  triggerAction: 'all',
+                  selectOnFocus: true
+                })
+        }, {
+                header : "SCodec",
+                dataIndex : 'scodec',
+                width : 100,
+                editor : new fm.TextField({})
+        }, {
 		header : "Comment",
 		dataIndex : 'comment',
 		width : 400,
@@ -69,9 +141,9 @@ tvheadend.acleditor = function() {
 
 	var UserRecord = Ext.data.Record.create([ 'enabled', 'streaming', 'dvr',
 		'dvrallcfg', 'admin', 'webui', 'username', 'prefix', 'password',
-		'comment' ]);
+		'comment', 'transcode', 'resolution', 'vcodec', 'acodec', 'scodec' ]);
 
 	return new tvheadend.tableEditor('Access control', 'accesscontrol', cm,
 		UserRecord, [ enabledColumn, streamingColumn, dvrColumn, dvrallcfgColumn,
-			webuiColumn, adminColumn ], null, 'config_access.html', 'group');
+			webuiColumn, adminColumn, transcodeColumn ], null, 'config_access.html', 'group');
 }

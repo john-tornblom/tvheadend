@@ -625,17 +625,27 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   streaming_component_type_t vcodec;
   streaming_component_type_t acodec;
   streaming_component_type_t scodec;
+  access_entry_t *ae;
 
   tr = NULL;
-  transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
-  resolution = ATOI(http_arg_get(&hc->hc_req_args, "resolution"), 480);
-  vcodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "vcodec"));
-  acodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "acodec"));
-  scodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "scodec"));
+  ae = access_entry_find_by_username(hc->hc_username);
+  transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), ae == NULL ? 0 : ae->ae_transcode);
+  resolution = ATOI(http_arg_get(&hc->hc_req_args, "resolution"), ae == NULL ? 480 : ae->ae_resolution);
+  if ((str = http_arg_get(&hc->hc_req_args, "vcodec")))
+    vcodec = streaming_component_txt2type(str);
+  else
+    vcodec = streaming_component_txt2type(ae == NULL ? "h264" : ae->ae_vcodec);
+  if ((str = http_arg_get(&hc->hc_req_args, "acodec")))
+    acodec = streaming_component_txt2type(str);
+  else
+    acodec = streaming_component_txt2type(ae == NULL ? "NONE" : ae->ae_acodec);
+  if ((str = http_arg_get(&hc->hc_req_args, "scodec")))
+    scodec = streaming_component_txt2type(str);
+  else
+    scodec = streaming_component_txt2type(ae == NULL ? "NONE" : ae->ae_scodec);
 
-  resolution = MIN(resolution, 576);
-  resolution = MAX(resolution, 144);
-  
+//  resolution = MIN(resolution, 587);
+//  resolution = MAX(resolution, 144);
 #endif
 
   mc = muxer_container_txt2type(http_arg_get(&hc->hc_req_args, "mux"));
