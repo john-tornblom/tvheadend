@@ -46,7 +46,7 @@
 #include "serviceprobe.h"
 #include "atomic.h"
 #include "dvb/dvb.h"
-#include "htsp.h"
+#include "htsp_server.h"
 #include "lang_codes.h"
 
 #define SERVICE_HASH_WIDTH 101
@@ -763,6 +763,7 @@ static struct strtab stypetab[] = {
   { "SDTV",         ST_DN_SDTV },
   { "HDTV",         ST_DN_HDTV },
   { "SDTV",         ST_SK_SDTV },
+  { "SDTV",         ST_NE_SDTV },
   { "SDTV-AC",      ST_AC_SDTV },
   { "HDTV-AC",      ST_AC_HDTV },
 };
@@ -789,6 +790,7 @@ service_is_tv(service_t *t)
     t->s_servicetype == ST_DN_SDTV ||
     t->s_servicetype == ST_DN_HDTV ||
     t->s_servicetype == ST_SK_SDTV ||
+    t->s_servicetype == ST_NE_SDTV ||
     t->s_servicetype == ST_AC_SDTV ||
     t->s_servicetype == ST_AC_HDTV;
 }
@@ -902,6 +904,7 @@ service_build_stream_start(service_t *t)
     ssc->ssc_pid = st->es_pid;
     ssc->ssc_width = st->es_width;
     ssc->ssc_height = st->es_height;
+    ssc->ssc_frameduration = st->es_frame_duration;
   }
 
   t->s_setsourceinfo(t, &ss->ss_si);

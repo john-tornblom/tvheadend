@@ -253,11 +253,11 @@ lav_muxer_mime(muxer_t* m, const struct streaming_start *ss)
   }
 
   if(has_video)
-    return muxer_container_mimetype(m->m_container, 1);
+    return muxer_container_type2mime(m->m_container, 1);
   else if(has_audio)
-    return muxer_container_mimetype(m->m_container, 0);
+    return muxer_container_type2mime(m->m_container, 0);
   else
-    return muxer_container_mimetype(MC_UNKNOWN, 0);
+    return muxer_container_type2mime(MC_UNKNOWN, 0);
 }
 
 
@@ -281,8 +281,10 @@ lav_muxer_init(muxer_t* m, const struct streaming_start *ss, const char *name)
   av_dict_set(&oc->metadata, "service_name", name, 0);
   av_dict_set(&oc->metadata, "service_provider", app, 0);
 
- if(lm->m_container == MC_MPEGTS)
+  if(lm->m_container == MC_MPEGTS)
     lm->lm_h264_filter = av_bitstream_filter_init("h264_mp4toannexb");
+
+  oc->max_delay = 0.7 * AV_TIME_BASE;
 
   for(i=0; i < ss->ss_num_components; i++) {
     ssc = &ss->ss_components[i];
@@ -304,7 +306,11 @@ lav_muxer_init(muxer_t* m, const struct streaming_start *ss, const char *name)
     }
   }
 
-  if(lm->lm_oc->nb_streams && avformat_write_header(lm->lm_oc, NULL) < 0) {
+  if(!lm->lm_oc->nb_streams) {
+    tvhlog(LOG_ERR, "libav",  "No supported streams available");
+    lm->m_errors++;
+    return -1;
+  } else if(avformat_write_header(lm->lm_oc, NULL) < 0) {
     tvhlog(LOG_ERR, "libav",  "Failed to write %s header", 
 	   muxer_container_type2txt(lm->m_container));
     lm->m_errors++;
@@ -385,6 +391,12 @@ lav_muxer_write_pkt(muxer_t *m, streaming_message_type_t smt, void *data)
   assert(smt == SMT_PACKET);
 
   oc = lm->lm_oc;
+
+  if(!oc->nb_streams) {
+    tvhlog(LOG_ERR, "libav",  "No streams to mux");
+    lm->m_errors++;
+    return -1;
+  }
 
   for(i=0; i<oc->nb_streams; i++) {
     st = oc->streams[i];
@@ -468,6 +480,8 @@ lav_muxer_close(muxer_t *m)
   for(i=0; i<lm->lm_oc->nb_streams; i++)
     av_freep(&lm->lm_oc->streams[i]->codec->extradata);
  
+  lm->lm_oc->nb_streams = 0;
+
   return ret;
 }
 

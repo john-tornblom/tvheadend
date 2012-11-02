@@ -35,7 +35,7 @@
 #include "tcp.h"
 #include "packet.h"
 #include "access.h"
-#include "htsp.h"
+#include "htsp_server.h"
 #include "streaming.h"
 #include "psi.h"
 #include "htsmsg_binary.h"
@@ -1126,22 +1126,27 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   uint32_t chid, sid, weight, req90khz, normts;
   channel_t *ch;
   htsp_subscription_t *hs;
-
 #if ENABLE_LIBAV
   uint32_t max_resolution;
   streaming_component_type_t acodec, vcodec, scodec;
   access_entry_t *ae;
 #endif
-
-  if(htsmsg_get_u32(in, "channelId", &chid))
-    return htsp_error("Missing argument 'channelId'");
+  const char *str;
 
   if(htsmsg_get_u32(in, "subscriptionId", &sid))
     return htsp_error("Missing argument 'subscriptionId'");
 
-  if((ch = channel_find_by_identifier(chid)) == NULL)
-    return htsp_error("Requested channel does not exist");
+  if(!htsmsg_get_u32(in, "channelId", &chid)) {
 
+    if((ch = channel_find_by_identifier(chid)) == NULL)
+      return htsp_error("Requested channel does not exist");
+  } else if((str = htsmsg_get_str(in, "channelName")) != NULL) {
+    if((ch = channel_find_by_name(str, 0, 0)) == NULL)
+      return htsp_error("Requested channel does not exist");
+
+  } else {
+    return htsp_error("Missing argument 'channelId' or 'channelName'");
+  }
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
   req90khz = htsmsg_get_u32_or_default(in, "90khz", 0);
   normts = htsmsg_get_u32_or_default(in, "normts", 0);
@@ -1918,9 +1923,12 @@ htsp_subscription_start(htsp_subscription_t *hs, const streaming_start_t *ss)
 
     if(ssc->ssc_type == SCT_MPEG2VIDEO || ssc->ssc_type == SCT_H264) {
       if(ssc->ssc_width)
-	      htsmsg_add_u32(c, "width", ssc->ssc_width);
+        htsmsg_add_u32(c, "width", ssc->ssc_width);
       if(ssc->ssc_height)
-	      htsmsg_add_u32(c, "height", ssc->ssc_height);
+        htsmsg_add_u32(c, "height", ssc->ssc_height);
+      if(ssc->ssc_frameduration)
+        htsmsg_add_u32(c, "duration", hs->hs_90khz ? ssc->ssc_frameduration :
+                       ts_rescale(ssc->ssc_frameduration, 1000000));
       if (ssc->ssc_aspect_num)
         htsmsg_add_u32(c, "aspect_num", ssc->ssc_aspect_num);
       if (ssc->ssc_aspect_den)
