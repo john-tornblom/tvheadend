@@ -34,7 +34,12 @@ typedef struct access_entry {
   struct in_addr ae_ip;
   int ae_prefixlen;
   int ae_enabled;
-  
+ 
+  int ae_transcode;
+  uint32_t ae_resolution;
+  char *ae_vcodec;
+  char *ae_acodec;
+  char *ae_scodec; 
 
   uint32_t ae_rights;
 
@@ -63,6 +68,9 @@ typedef struct access_ticket {
 #define ACCESS_ADMIN           0x10
 #define ACCESS_FULL 0x3f
 
+access_entry_t *
+access_entry_find_by_username(const char *username);
+
 /**
  * Create a new ticket for the requested resource and generate a id for it
  */
@@ -74,6 +82,7 @@ const char* access_ticket_create(const char *resource);
 int access_ticket_verify(const char *id, const char *resource);
 
 int access_ticket_delete(const char *ticket_id);
+
 /**
  * Verifies that the given user in combination with the source ip
  * complies with the requested mask

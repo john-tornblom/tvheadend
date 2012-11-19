@@ -351,11 +351,23 @@ access_entry_find(const char *id, int create)
   ae->ae_username = strdup("*");
   ae->ae_password = strdup("*");
   ae->ae_comment = strdup("New entry");
+  ae->ae_vcodec = strdup("");
+  ae->ae_acodec = strdup("");
+  ae->ae_scodec = strdup("");
   TAILQ_INSERT_TAIL(&access_entries, ae, ae_link);
   return ae;
 }
 
-
+access_entry_t *
+access_entry_find_by_username(const char *username)
+{
+  access_entry_t *ae;
+  TAILQ_FOREACH(ae, &access_entries, ae_link) {
+    if(!strcmp(ae->ae_username, username))
+    return ae;
+  }
+  return NULL;
+}
 
 /**
  *
@@ -394,7 +406,12 @@ access_record_build(access_entry_t *ae)
   htsmsg_add_u32(e, "dvrallcfg", ae->ae_rights & ACCESS_RECORDER_ALL  ? 1 : 0);
   htsmsg_add_u32(e, "webui"    , ae->ae_rights & ACCESS_WEB_INTERFACE ? 1 : 0);
   htsmsg_add_u32(e, "admin"    , ae->ae_rights & ACCESS_ADMIN         ? 1 : 0);
-
+ 
+  htsmsg_add_u32(e, "transcode", !!ae->ae_transcode); 
+  htsmsg_add_u32(e, "resolution", ae->ae_resolution);
+  htsmsg_add_str(e, "vcodec",  ae->ae_vcodec);
+  htsmsg_add_str(e, "acodec",  ae->ae_acodec);
+  htsmsg_add_str(e, "scodec",  ae->ae_scodec);
 
   htsmsg_add_str(e, "id", ae->ae_id);
   
@@ -494,6 +511,27 @@ access_record_update(void *opaque, const char *id, htsmsg_t *values,
 
   if(!htsmsg_get_u32(values, "webui", &u32))
     access_update_flag(ae, ACCESS_WEB_INTERFACE, u32);
+
+  if(!htsmsg_get_u32(values, "transcode", &u32))
+    ae->ae_transcode = u32;
+
+  if((s = htsmsg_get_str(values, "vcodec")) != NULL) {
+    free(ae->ae_vcodec);
+    ae->ae_vcodec = strdup(s);
+  }
+
+  if((s = htsmsg_get_str(values, "acodec")) != NULL) {
+    free(ae->ae_acodec);
+    ae->ae_acodec = strdup(s);
+  }
+
+  if((s = htsmsg_get_str(values, "scodec")) != NULL) {
+    free(ae->ae_scodec);
+    ae->ae_scodec = strdup(s);
+  }
+
+  if(!htsmsg_get_u32(values, "resolution", &u32))
+    ae->ae_resolution = u32;
 
   return access_record_build(ae);
 }

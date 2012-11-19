@@ -1215,6 +1215,7 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 #if ENABLE_LIBAV
   uint32_t max_resolution;
   streaming_component_type_t acodec, vcodec, scodec;
+  access_entry_t *ae;
 #endif
   const char *str;
 
@@ -1237,10 +1238,11 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   normts = htsmsg_get_u32_or_default(in, "normts", 0);
 
 #if ENABLE_LIBAV
-  max_resolution = htsmsg_get_u32_or_default(in, "maxWidth", 0);
-  vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
-  acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
-  scodec = streaming_component_txt2type(htsmsg_get_str(in, "subtitleCodec"));
+  ae = access_entry_find_by_username(htsp->htsp_username);
+  max_resolution = htsmsg_get_u32_or_default(in, "maxWidth", ae == NULL || !ae->ae_transcode ? 0 : ae->ae_resolution);
+  vcodec = streaming_component_txt2type(htsmsg_get_str_or_default(in, "videoCodec", ae == NULL ? "h264" : ae->ae_vcodec));
+  acodec = streaming_component_txt2type(htsmsg_get_str_or_default(in, "audioCodec", ae == NULL ? "NONE" : ae->ae_acodec));
+  scodec = streaming_component_txt2type(htsmsg_get_str_or_default(in, "subtitleCodec", ae == NULL ? "NONE" : ae->ae_scodec));
 #endif
 
   /*
