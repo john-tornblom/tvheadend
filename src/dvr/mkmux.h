@@ -36,6 +36,8 @@ int mk_mux_open_stream(mk_mux_t *mkm, int fd);
 int mk_mux_init(mk_mux_t *mkm, const char *title, 
 		const struct streaming_start *ss);
 
+int mk_mux_reconf(mk_mux_t *mkm, const struct streaming_start *ss);
+
 int mk_mux_write_pkt (mk_mux_t *mkm, struct th_pkt *pkt);
 int mk_mux_write_meta(mk_mux_t *mkm, const struct dvr_entry *de,
 		      const struct epg_broadcast *eb);

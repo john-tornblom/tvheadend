@@ -129,6 +129,36 @@ header_complete(streaming_start_component_t *ssc, int not_so_picky)
   return 1;
 }
 
+
+/**
+ *
+ */
+static int
+header_changed(streaming_start_component_t *ssc, th_pkt_t *pkt)
+{
+  if(!ssc)
+    return 1;
+
+  if(ssc->ssc_aspect_num != pkt->pkt_aspect_num &&
+     pkt->pkt_aspect_num != 0)
+    return 1;
+
+  if(ssc->ssc_aspect_den != pkt->pkt_aspect_den &&
+     pkt->pkt_aspect_den != 0)
+    return 1;
+
+  if(ssc->ssc_sri != pkt->pkt_sri &&
+     pkt->pkt_sri != 0)
+    return 1;
+
+  if(ssc->ssc_channels != pkt->pkt_channels &&
+     pkt->pkt_channels != 0)
+    return 1;
+
+  return 0;
+}
+
+
 /**
  *
  */
@@ -290,8 +320,20 @@ gh_pass(globalheaders_t *gh, streaming_message_t *sm)
     pkt = sm->sm_data;
     ssc = streaming_start_component_find_by_index(gh->gh_ss, 
 						  pkt->pkt_componentindex);
-    sm->sm_data = convertpkt(ssc, pkt);
-    streaming_target_deliver2(gh->gh_output, sm);
+
+    if(header_changed(ssc, pkt)) {
+      if(ssc->ssc_gh)
+	pktbuf_ref_dec(ssc->ssc_gh);
+
+      ssc->ssc_gh = NULL;
+      gh->gh_passthru = 0;
+
+      sm = streaming_msg_create_code(SMT_STOP, SM_CODE_SOURCE_RECONFIGURED);
+      streaming_target_deliver2(gh->gh_output, sm);
+    } else {
+      sm->sm_data = convertpkt(ssc, pkt);
+      streaming_target_deliver2(gh->gh_output, sm);
+    }
     break;
   }
 }

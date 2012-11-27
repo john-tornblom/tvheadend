@@ -90,7 +90,10 @@ tvh_muxer_reconfigure(muxer_t* m, const struct streaming_start *ss)
 {
   tvh_muxer_t *tm = (tvh_muxer_t*)m;
 
-  tm->m_errors++;
+  if(mk_mux_reconf(tm->tm_ref, ss)) {
+    tm->m_errors++;
+    return -1;
+  }
 
   return -1;
 }
