@@ -126,6 +126,9 @@ const tvh_caps_t tvheadend_capabilities[] = {
 #if ENABLE_LINUXDVB
   { "linuxdvb", NULL },
 #endif
+#if ENABLE_LIBAV
+ { "transcoding", NULL },
+#endif
 #if ENABLE_IMAGECACHE
   { "imagecache", &imagecache_enabled },
 #endif

@@ -188,7 +188,8 @@ SRCS-$(CONFIG_AVAHI) += src/avahi.c
 
 # libav
 SRCS-$(CONFIG_LIBAV) += src/libav.c \
-	src/muxer/muxer_libav.c
+	src/muxer/muxer_libav.c \
+	src/plumbing/transcode.c
 
 # CWC
 SRCS-${CONFIG_CWC} += src/cwc.c \

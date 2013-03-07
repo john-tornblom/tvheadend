@@ -40,12 +40,15 @@
 #include "psi.h"
 #include "plumbing/tsfix.h"
 #include "plumbing/globalheaders.h"
+#include "plumbing/transcode.h"
 #include "epg.h"
 #include "muxer.h"
 #include "dvb/dvb.h"
 #include "dvb/dvb_support.h"
 #include "imagecache.h"
 #include "tcp.h"
+
+#define ATOI(x, y) x ? atoi(x) : y;
 
 /**
  *
@@ -669,6 +672,26 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   const char *name;
   char addrbuf[50];
 
+#if ENABLE_LIBAV
+  streaming_target_t *tr;
+  int transcode;
+  int resolution;
+  streaming_component_type_t vcodec;
+  streaming_component_type_t acodec;
+  streaming_component_type_t scodec;
+
+  tr = NULL;
+  transcode = ATOI(http_arg_get(&hc->hc_req_args, "transcode"), 0);
+  resolution = ATOI(http_arg_get(&hc->hc_req_args, "resolution"), 480);
+  vcodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "vcodec"));
+  acodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "acodec"));
+  scodec = streaming_component_txt2type(http_arg_get(&hc->hc_req_args, "scodec"));
+
+  resolution = MIN(resolution, 576);
+  resolution = MAX(resolution, 144);
+  
+#endif
+
   mc = muxer_container_txt2type(http_arg_get(&hc->hc_req_args, "mux"));
   if(mc == MC_UNKNOWN) {
     cfg = dvr_config_find_by_name_default("");
@@ -689,6 +712,12 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   } else {
     streaming_queue_init2(&sq, 0, qsize);
     gh = globalheaders_create(&sq.sq_st);
+#if ENABLE_LIBAV
+    if(transcode) {
+      tr = transcoder_create(gh, resolution, vcodec, acodec, scodec);
+      tsfix = tsfix_create(tr);
+    } else
+#endif
     tsfix = tsfix_create(gh);
     st = tsfix;
     flags = 0;

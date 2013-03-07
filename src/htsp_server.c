@@ -42,6 +42,9 @@
 #include "htsmsg_binary.h"
 #include "epg.h"
 #include "plumbing/tsfix.h"
+#if ENABLE_LIBAV
+#include "plumbing/transcode.h"
+#endif
 #include "imagecache.h"
 #if ENABLE_TIMESHIFT
 #include "timeshift.h"
@@ -172,6 +175,10 @@ typedef struct htsp_subscription {
 
   streaming_target_t hs_input;
   streaming_target_t *hs_tsfix;
+
+#if ENABLE_LIBAV
+  streaming_target_t *hs_transcoder;
+#endif
 
 #if ENABLE_TIMESHIFT
   streaming_target_t *hs_tshift;
@@ -1252,6 +1259,10 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
 #if ENABLE_TIMESHIFT
   uint32_t timeshiftPeriod = 0;
 #endif
+#if ENABLE_LIBAV
+  uint32_t max_resolution;
+  streaming_component_type_t acodec, vcodec, scodec;
+#endif
   channel_t *ch;
   htsp_subscription_t *hs;
   const char *str;
@@ -1272,6 +1283,13 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   weight = htsmsg_get_u32_or_default(in, "weight", 150);
   req90khz = htsmsg_get_u32_or_default(in, "90khz", 0);
   normts = htsmsg_get_u32_or_default(in, "normts", 0);
+
+#if ENABLE_LIBAV
+  max_resolution = htsmsg_get_u32_or_default(in, "maxResolution", 0);
+  vcodec = streaming_component_txt2type(htsmsg_get_str(in, "videoCodec"));
+  acodec = streaming_component_txt2type(htsmsg_get_str(in, "audioCodec"));
+  scodec = streaming_component_txt2type(htsmsg_get_str(in, "subtitleCodec"));
+#endif
 
 #if ENABLE_TIMESHIFT
   if (timeshift_enabled) {
@@ -1317,6 +1335,18 @@ htsp_method_subscribe(htsp_connection_t *htsp, htsmsg_t *in)
   streaming_target_init(&hs->hs_input, htsp_streaming_input, hs, 0);
 
   streaming_target_t *st = &hs->hs_input;
+
+#if ENABLE_LIBAV
+  if(max_resolution) {
+    hs->hs_transcoder = transcoder_create(st, 
+					  max_resolution,
+					  vcodec,
+					  acodec,
+					  scodec);
+    st = hs->hs_transcoder;
+    normts = 1;
+  }
+#endif
 
 #if ENABLE_TIMESHIFT
   if (timeshiftPeriod != 0) {
@@ -1566,6 +1596,29 @@ htsp_method_file_read(htsp_connection_t *htsp, htsmsg_t *in)
   return rep;
 }
 
+
+#if ENABLE_LIBAV
+/**
+ *
+ */
+static htsmsg_t *
+htsp_method_getCodecs(htsp_connection_t *htsp, htsmsg_t *in)
+{
+  htsmsg_t *out, *l;
+
+  l = htsmsg_create_list();
+  transcoder_get_encoders(l);
+
+  out = htsmsg_create_map();
+  
+  htsmsg_add_msg(out, "encoders", l);
+
+  return out;
+}
+#endif
+
+
+
 /**
  *
  */
@@ -1657,6 +1710,9 @@ struct {
   { "getEvents",                htsp_method_getEvents,      ACCESS_STREAMING},
   { "epgQuery",                 htsp_method_epgQuery,       ACCESS_STREAMING},
   { "getEpgObject",             htsp_method_getEpgObject,   ACCESS_STREAMING},
+#if ENABLE_LIBAV
+  { "getCodecs",                htsp_method_getCodecs,      ACCESS_STREAMING},
+#endif
   { "addDvrEntry",              htsp_method_addDvrEntry,    ACCESS_RECORDER},
   { "updateDvrEntry",           htsp_method_updateDvrEntry, ACCESS_RECORDER},
   { "cancelDvrEntry",           htsp_method_cancelDvrEntry, ACCESS_RECORDER},

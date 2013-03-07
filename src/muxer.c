@@ -23,7 +23,7 @@
 #include "muxer.h"
 #include "muxer/muxer_tvh.h"
 #include "muxer/muxer_pass.h"
-#if CONFIG_LIBAV
+#if ENABLE_LIBAV
 #include "muxer/muxer_libav.h"
 #endif
 
@@ -240,7 +240,7 @@ muxer_create(muxer_container_type_t mc)
   if(!m)
     m = tvh_muxer_create(mc);
 
-#if CONFIG_LIBAV
+#if ENABLE_LIBAV
   if(!m)
     m = lav_muxer_create(mc);
 #endif

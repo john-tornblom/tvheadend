@@ -177,7 +177,8 @@ int get_device_connection(const char *dev);
  * Stream component types
  */
 typedef enum {
-  SCT_UNKNOWN = 0,
+  SCT_UNKNOWN = -1,
+  SCT_NONE = 0,
   SCT_MPEG2VIDEO = 1,
   SCT_MPEG2AUDIO,
   SCT_H264,
@@ -191,12 +192,18 @@ typedef enum {
   SCT_TEXTSUB,
   SCT_EAC3,
   SCT_MP4A,
+  SCT_MPEG4VIDEO,
+  SCT_VP8,
+  SCT_VORBIS,
 } streaming_component_type_t;
 
-#define SCT_ISVIDEO(t) ((t) == SCT_MPEG2VIDEO || (t) == SCT_H264)
+#define SCT_ISVIDEO(t) ((t) == SCT_MPEG2VIDEO || (t) == SCT_H264 || \
+			(t) == SCT_MPEG4VIDEO || (t) == SCT_VP8)
+
 #define SCT_ISAUDIO(t) ((t) == SCT_MPEG2AUDIO || (t) == SCT_AC3 || \
                         (t) == SCT_AAC || (t) == SCT_MP4A ||	   \
-			(t) == SCT_EAC3)
+			(t) == SCT_EAC3 || (t) == SCT_VORBIS)
+
 #define SCT_ISSUBTITLE(t) ((t) == SCT_TEXTSUB || (t) == SCT_DVBSUB)
 
 /**
@@ -418,6 +425,7 @@ typedef struct sbuf {
 
 
 const char *streaming_component_type2txt(streaming_component_type_t s);
+streaming_component_type_t streaming_component_txt2type(const char *str);
 
 static inline unsigned int tvh_strhash(const char *s, unsigned int mod)
 {

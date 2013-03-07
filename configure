@@ -128,6 +128,10 @@ if enabled_or_auto libav; then
     has_libav=false
   fi
 
+  if $has_libav && ! check_pkg libswscale ">=0.13.0"; then
+    has_libav=false
+  fi
+
   if $has_libav && ! check_pkg libavformat "<=55.0.0"; then
     has_libav=false
   fi
