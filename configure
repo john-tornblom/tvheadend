@@ -25,6 +25,7 @@ OPTIONS=(
   "avahi:auto"
   "zlib:auto"
   "libav:auto"
+  "libvlc:auto"
   "inotify:auto"
   "bundle:no"
   "dvbcsa:no"
@@ -107,6 +108,17 @@ if enabled_or_auto avahi; then
     enable avahi
   elif enabled avahi; then
     die "Avahi development support not found (use --disable-avahi)"
+  fi
+fi
+
+#
+# libVLC
+#
+if enabled_or_auto libvlc; then
+  if check_pkg libvlc && check_pkg vlc-plugin; then
+    enable libvlc
+  elif enabled libvlc; then
+    die "libVLC development support not found (use --disable-libvlc)"
   fi
 fi
 
