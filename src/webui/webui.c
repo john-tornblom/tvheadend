@@ -672,7 +672,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   const char *name;
   char addrbuf[50];
 
-#if ENABLE_LIBAV
+#if ENABLE_LIBAV || ENABLE_LIBVLC
   streaming_target_t *tr;
   int transcode;
   int resolution;
@@ -712,7 +712,7 @@ http_stream_channel(http_connection_t *hc, channel_t *ch)
   } else {
     streaming_queue_init2(&sq, 0, qsize);
     gh = globalheaders_create(&sq.sq_st);
-#if ENABLE_LIBAV
+#if ENABLE_LIBAV || ENABLE_LIBVLC
     if(transcode) {
       tr = transcoder_create(gh, resolution, vcodec, acodec, scodec);
       tsfix = tsfix_create(tr);

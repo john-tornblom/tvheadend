@@ -191,6 +191,8 @@ SRCS-$(CONFIG_LIBAV) += src/libav.c \
 	src/muxer/muxer_libav.c \
 	src/plumbing/transcode.c
 
+SRCS-$(CONFIG_LIBVLC) += src/plumbing/transcode.c
+
 # CWC
 SRCS-${CONFIG_CWC} += src/cwc.c \
 	src/capmt.c
