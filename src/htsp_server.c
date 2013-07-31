@@ -1904,15 +1904,69 @@ htsp_read_message(htsp_connection_t *htsp, htsmsg_t **mp, int timeout)
   return 0;
 }
 
+
+/**
+ *
+ */
+static int
+htsp_handle_message(htsp_connection_t *htsp, htsmsg_t *m)
+{
+  const char *method;
+  htsmsg_t *reply;
+  int i;
+
+  pthread_mutex_lock(&global_lock);
+  htsp_authenticate(htsp, m);
+
+  if((method = htsmsg_get_str(m, "method")) != NULL) {
+    for(i = 0; i < NUM_METHODS; i++) {
+      if(!strcmp(method, htsp_methods[i].name)) {
+
+	if((htsp->htsp_granted_access & htsp_methods[i].privmask) != 
+	   htsp_methods[i].privmask) {
+
+	  pthread_mutex_unlock(&global_lock);
+
+	  /* Classic authentication failed delay */
+	  usleep(250000);
+	    
+	  reply = htsmsg_create_map();
+	  htsmsg_add_u32(reply, "noaccess", 1);
+	  htsp_reply(htsp, m, reply);
+
+	  return -1;
+	}
+	reply = htsp_methods[i].fn(htsp, m);
+	break;
+      }
+    }
+
+    if(i == NUM_METHODS) {
+      reply = htsp_error("Method not found");
+    }
+
+  } else {
+    reply = htsp_error("No 'method' argument");
+  }
+  
+  pthread_mutex_unlock(&global_lock);
+
+  if(reply != NULL) /* Methods can do all the replying inline */
+    htsp_reply(htsp, m, reply);
+
+  return 0;
+}
+
+
 /**
  *
  */
 static int
 htsp_read_loop(htsp_connection_t *htsp)
 {
-  htsmsg_t *m = NULL, *reply;
-  int r, i;
-  const char *method;
+  htsmsg_t *m = NULL;
+  int rc;
+
 
   if(htsp_generate_challenge(htsp)) {
     tvhlog(LOG_ERR, "htsp", "%s: Unable to generate challenge",
@@ -1930,52 +1984,10 @@ htsp_read_loop(htsp_connection_t *htsp)
   /* Session main loop */
 
   while(1) {
-readmsg:
-    if((r = htsp_read_message(htsp, &m, 0)) != 0)
-      return r;
+    if((rc = htsp_read_message(htsp, &m, 0)) != 0)
+      return rc;
 
-    pthread_mutex_lock(&global_lock);
-    htsp_authenticate(htsp, m);
-
-    if((method = htsmsg_get_str(m, "method")) != NULL) {
-      for(i = 0; i < NUM_METHODS; i++) {
-	      if(!strcmp(method, htsp_methods[i].name)) {
-
-	        if((htsp->htsp_granted_access & htsp_methods[i].privmask) != 
-	           htsp_methods[i].privmask) {
-
-      	    pthread_mutex_unlock(&global_lock);
-
-	          /* Classic authentication failed delay */
-	          usleep(250000);
-	    
-	          reply = htsmsg_create_map();
-	          htsmsg_add_u32(reply, "noaccess", 1);
-	          htsp_reply(htsp, m, reply);
-
-	          htsmsg_destroy(m);
-	          goto readmsg;
-
-	        } else {
-	          reply = htsp_methods[i].fn(htsp, m);
-	        }
-	        break;
-	      }
-      }
-
-      if(i == NUM_METHODS) {
-	      reply = htsp_error("Method not found");
-      }
-
-    } else {
-      reply = htsp_error("No 'method' argument");
-    }
-
-    pthread_mutex_unlock(&global_lock);
-
-    if(reply != NULL) /* Methods can do all the replying inline */
-      htsp_reply(htsp, m, reply);
-
+    htsp_handle_message(htsp, m);
     htsmsg_destroy(m);
   }
 }
@@ -2046,83 +2058,76 @@ htsp_write_scheduler(void *aux)
   return NULL;
 }
 
-/**
- *
- */
+
+
+
 static void
-htsp_serve(int fd, void *opaque, struct sockaddr_storage *source,
-	   struct sockaddr_storage *self)
+htsp_connection_init(htsp_connection_t *htsp, int fd, struct sockaddr_storage *source,
+		     void *(*write_scheduler)(void *))
 {
-  htsp_connection_t htsp;
   char buf[50];
-  htsp_subscription_t *s;
 
-  tcp_get_ip_str((struct sockaddr*)source, buf, 50);
+  tcp_get_ip_str((struct sockaddr *)source, buf, 50);
 
-  memset(&htsp, 0, sizeof(htsp_connection_t));
+  memset(htsp, 0, sizeof(htsp_connection_t));
 
-  TAILQ_INIT(&htsp.htsp_active_output_queues);
+  TAILQ_INIT(&htsp->htsp_active_output_queues);
 
-  htsp_init_queue(&htsp.htsp_hmq_ctrl, 0);
-  htsp_init_queue(&htsp.htsp_hmq_qstatus, 1);
-  htsp_init_queue(&htsp.htsp_hmq_epg, 0);
+  htsp_init_queue(&htsp->htsp_hmq_ctrl, 0);
+  htsp_init_queue(&htsp->htsp_hmq_qstatus, 1);
+  htsp_init_queue(&htsp->htsp_hmq_epg, 0);
 
-  htsp.htsp_peername = strdup(buf);
-  htsp_update_logname(&htsp);
+  htsp->htsp_peername = strdup(buf);
+  htsp_update_logname(htsp);
 
-  htsp.htsp_fd = fd;
-  htsp.htsp_peer = source;
-  htsp.htsp_writer_run = 1;
+  htsp->htsp_fd = fd;
+  htsp->htsp_peer = source;
+  htsp->htsp_writer_run = 1;
 
   pthread_mutex_lock(&global_lock);
-  LIST_INSERT_HEAD(&htsp_connections, &htsp, htsp_link);
+  LIST_INSERT_HEAD(&htsp_connections, htsp, htsp_link);
   pthread_mutex_unlock(&global_lock);
 
-  pthread_create(&htsp.htsp_writer_thread, NULL, htsp_write_scheduler, &htsp);
+  pthread_create(&htsp->htsp_writer_thread, NULL, write_scheduler, htsp);
+}
 
-  /**
-   * Reader loop
-   */
 
-  htsp_read_loop(&htsp);
-
-  tvhlog(LOG_INFO, "htsp", "%s: Disconnected", htsp.htsp_logname);
-
-  /**
-   * Ok, we're back, other end disconnected. Clean up stuff.
-   */
+static void
+htsp_connection_fini(htsp_connection_t *htsp)
+{
+  htsp_subscription_t *s;
 
   pthread_mutex_lock(&global_lock);
 
   /* Beware! Closing subscriptions will invoke a lot of callbacks
      down in the streaming code. So we do this as early as possible
      to avoid any weird lockups */
-  while((s = LIST_FIRST(&htsp.htsp_subscriptions)) != NULL) {
-    htsp_subscription_destroy(&htsp, s);
+  while((s = LIST_FIRST(&htsp->htsp_subscriptions)) != NULL) {
+    htsp_subscription_destroy(htsp, s);
   }
 
-  if(htsp.htsp_async_mode)
-    LIST_REMOVE(&htsp, htsp_async_link);
+  if(htsp->htsp_async_mode)
+    LIST_REMOVE(htsp, htsp_async_link);
 
-  LIST_REMOVE(&htsp, htsp_link);
+  LIST_REMOVE(htsp, htsp_link);
 
   pthread_mutex_unlock(&global_lock);
 
-  pthread_mutex_lock(&htsp.htsp_out_mutex);
-  htsp.htsp_writer_run = 0;
-  pthread_cond_signal(&htsp.htsp_out_cond);
-  pthread_mutex_unlock(&htsp.htsp_out_mutex);
 
-  pthread_join(htsp.htsp_writer_thread, NULL);
+  pthread_mutex_lock(&htsp->htsp_out_mutex);
+  htsp->htsp_writer_run = 0;
+  pthread_cond_signal(&htsp->htsp_out_cond);
+  pthread_mutex_unlock(&htsp->htsp_out_mutex);
 
-  free(htsp.htsp_logname);
-  free(htsp.htsp_peername);
-  free(htsp.htsp_username);
-  free(htsp.htsp_clientname);
+  pthread_join(htsp->htsp_writer_thread, NULL);
+
+  free(htsp->htsp_logname);
+  free(htsp->htsp_peername);
+  free(htsp->htsp_username);
+  free(htsp->htsp_clientname);
 
   htsp_msg_q_t *hmq;
-
-  TAILQ_FOREACH(hmq, &htsp.htsp_active_output_queues, hmq_link) {
+  TAILQ_FOREACH(hmq, &htsp->htsp_active_output_queues, hmq_link) {
     htsp_msg_t *hm;
     while((hm = TAILQ_FIRST(&hmq->hmq_q)) != NULL) {
       TAILQ_REMOVE(&hmq->hmq_q, hm, hm_link);
@@ -2131,11 +2136,29 @@ htsp_serve(int fd, void *opaque, struct sockaddr_storage *source,
   }
 
   htsp_file_t *hf;
-  while((hf = LIST_FIRST(&htsp.htsp_files)) != NULL)
+  while((hf = LIST_FIRST(&htsp->htsp_files)) != NULL)
     htsp_file_destroy(hf);
+}
 
+
+/**
+ *
+ */
+static void
+htsp_serve(int fd, void *opaque, struct sockaddr_storage *source,
+	   struct sockaddr_storage *self)
+{
+  htsp_connection_t htsp;
+
+  htsp_connection_init(&htsp, fd, source, htsp_write_scheduler);
+  htsp_read_loop(&htsp);
+
+  tvhlog(LOG_INFO, "htsp", "%s: Disconnected", htsp.htsp_logname);
+  htsp_connection_fini(&htsp);
+  
   close(fd);
 }
+
 
 /**
  *  Fire up HTSP server
