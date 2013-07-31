@@ -90,8 +90,6 @@ typedef struct http_connection {
   char *hc_post_data;
   unsigned int hc_post_len;
 
-  struct rtsp *hc_rtsp_session;
-
 } http_connection_t;
 
 

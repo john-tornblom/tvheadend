@@ -362,9 +362,6 @@ function setServerIpPort(o) {
 	tvheadend.serverPort = o.port;
 }
 
-function makeRTSPprefix() {
-	return 'rtsp://' + tvheadend.serverIp + ':' + tvheadend.serverPort + '/';
-}
 
 /**
  *
