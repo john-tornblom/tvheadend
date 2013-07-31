@@ -513,6 +513,8 @@ uint32_t tvh_crc32(uint8_t *data, size_t datalen, uint32_t crc);
 
 int base64_decode(uint8_t *out, const char *in, int out_size);
 
+int base64_encode(char *out, const uint8_t *in, int out_size, int in_size);
+
 int put_utf8(char *out, int c);
 
 static inline int64_t ts_rescale(int64_t ts, int tb)

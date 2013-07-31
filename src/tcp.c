@@ -293,6 +293,17 @@ tcp_read_data(int fd, char *buf, const size_t bufsize, htsbuf_queue_t *spill)
   return 0;
 }
 
+
+/**
+ *
+ */
+int
+tcp_read_queue(int fd, htsbuf_queue_t *q)
+{
+  return tcp_fill_htsbuf_from_fd(fd, q);
+}
+
+
 /**
  *
  */

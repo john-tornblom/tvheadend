@@ -28,6 +28,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <openssl/sha.h>
 
 #include "tvheadend.h"
 #include "tcp.h"
@@ -123,6 +124,7 @@ static const char *
 http_rc2str(int code)
 {
   switch(code) {
+  case HTTP_STATUS_SWICH_PROTO:     return "Switching Protocols";
   case HTTP_STATUS_OK:              return "OK";
   case HTTP_STATUS_PARTIAL_CONTENT: return "Partial Content";
   case HTTP_STATUS_NOT_FOUND:       return "Not found";
@@ -808,6 +810,241 @@ http_serve(int fd, void *opaque, struct sockaddr_storage *peer,
   htsbuf_queue_flush(&hc.hc_reply);
   htsbuf_queue_flush(&spill);
   close(fd);
+}
+
+
+/**
+ *
+ */
+static void
+websocket_append_hdr(htsbuf_queue_t *q, int opcode, size_t len)
+{
+  uint8_t hdr[14]; // max header length
+  int hlen;
+  hdr[0] = 0x80 | (opcode & 0xf);
+  if(len <= 125) {
+    hdr[1] = len;
+    hlen = 2;
+  } else if(len < 65536) {
+    hdr[1] = 126;
+    hdr[2] = len >> 8;
+    hdr[3] = len;
+    hlen = 4;
+  } else {
+    hdr[1] = 127;
+    uint64_t u64 = len;
+#if defined(__LITTLE_ENDIAN__)
+    u64 = __builtin_bswap64(u64);
+#endif
+    memcpy(hdr + 2, &u64, sizeof(uint64_t));
+    hlen = 10;
+  }
+
+  htsbuf_append(q, hdr, hlen);
+}
+
+
+/**
+ *
+ */
+int
+websocket_send(int fd, int opcode, const void *data, size_t len)
+{
+  int rc;
+  htsbuf_queue_t out;
+
+  htsbuf_queue_init(&out, 0);
+
+  websocket_append_hdr(&out, opcode, len);
+  htsbuf_append(&out, data, len);
+
+  rc = tcp_write_queue(fd, &out) ? -1 : 0;
+  htsbuf_queue_flush(&out);
+
+  return rc;
+}
+
+
+/**
+ *
+ */
+int
+websocket_sendq(int fd, int opcode, htsbuf_queue_t *hq)
+{
+  int rc;
+  htsbuf_queue_t out;
+
+  htsbuf_queue_init(&out, 0);
+
+  websocket_append_hdr(&out, opcode, hq->hq_size);
+  htsbuf_appendq(&out, hq);
+
+  rc = tcp_write_queue(fd, &out) ? -1 : 0;
+  htsbuf_queue_flush(&out);
+
+  return rc;
+}
+
+
+/**
+ *
+ */
+static int
+websocket_input(http_connection_t *hc, htsbuf_queue_t *q,
+		websocket_callback_data_t *cb)
+{
+  uint8_t hdr[14]; // max header length
+  int p = htsbuf_peek(q, &hdr, 14);
+  const uint8_t *m;
+  int rc;
+
+  if(p < 2)
+    return 0;
+
+  int opcode  = hdr[0] & 0xf;
+  int64_t len = hdr[1] & 0x7f;
+  int hoff = 2;
+
+  if(len == 126) {
+    if(p < 4)
+      return 0;
+    len = hdr[2] << 8 | hdr[3];
+    hoff = 4;
+  } else if(len == 127) {
+    if(p < 10)
+      return 0;
+    memcpy(&len, hdr + 2, sizeof(uint64_t));
+#if defined(__LITTLE_ENDIAN__)
+    len = __builtin_bswap64(len);
+#endif
+    hoff = 10;
+  }
+
+  if(hdr[1] & 0x80) {
+    if(p < hoff + 4)
+      return 0;
+    m = hdr + hoff;
+
+    hoff += 4;
+  } else {
+    m = NULL;
+  }
+
+  if(q->hq_size < hoff + len)
+    return 0;
+
+  uint8_t *d = malloc(len+1);
+  if(d == NULL)
+    return -1;
+
+  htsbuf_drop(q, hoff);
+  htsbuf_read(q, d, len);
+  d[len] = 0;
+
+  if(m != NULL) {
+    int i;
+    for(i = 0; i < len; i++)
+      d[i] ^= m[i&3];
+  }
+
+  if(opcode == WS_OPCODE_PING)
+    rc = websocket_send(hc->hc_fd, WS_OPCODE_PONG, d, len);
+  else if(opcode == WS_OPCODE_CONNECTION_CLOSE)
+    rc = -1;
+  else if(cb)
+    rc = cb(hc, opcode, d, len);
+  else
+    rc = -1;
+
+  free(d);
+  return rc;
+}
+
+
+#define WSGUID "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+/**
+ *
+ */
+static int
+http_websocket_loop(http_connection_t *hc, const char *remain, void *opaque)
+{
+  SHA_CTX shactx;
+  uint8_t digest[20];
+  char sig[64];
+  const char *wskey;
+  const char *origin;
+  const char *host;
+  htsbuf_queue_t hdrs;
+  websocket_handler_t *wsh;
+  int rc;
+
+  wsh = (websocket_handler_t *)opaque;
+  rc = 0;
+
+  if(!(host = http_arg_get(&hc->hc_args, "Host"))) {
+    http_error(hc, HTTP_STATUS_BAD_REQUEST);
+    return HTTP_STATUS_BAD_REQUEST;
+  }
+
+  if(!(origin = http_arg_get(&hc->hc_args, "Origin"))) {
+    http_error(hc, HTTP_STATUS_BAD_REQUEST);
+    return HTTP_STATUS_BAD_REQUEST;
+  }
+
+  if(!(wskey = http_arg_get(&hc->hc_args, "Sec-WebSocket-Key"))) {
+    http_error(hc, HTTP_STATUS_BAD_REQUEST);
+    return HTTP_STATUS_BAD_REQUEST;
+  }
+
+  SHA1_Init(&shactx);
+  SHA1_Update(&shactx, (const uint8_t *)wskey, strlen(wskey));
+  SHA1_Update(&shactx, (const uint8_t *)WSGUID, strlen(WSGUID));
+  SHA1_Final(digest, &shactx);
+
+  if(base64_encode(sig, digest, sizeof(sig), sizeof(digest)) < 0) {
+    http_error(hc, HTTP_STATUS_BAD_REQUEST);
+    return HTTP_STATUS_BAD_REQUEST;
+  }
+
+  htsbuf_queue_init(&hdrs, 0);
+  htsbuf_qprintf(&hdrs, "%s %d %s\r\n",
+		 val2str(hc->hc_version, HTTP_versiontab),
+		 HTTP_STATUS_SWICH_PROTO,
+		 http_rc2str(HTTP_STATUS_SWICH_PROTO));
+
+  htsbuf_qprintf(&hdrs, "Server: HTS/tvheadend\r\n");
+  htsbuf_qprintf(&hdrs, "Connection: Upgrade\r\n");
+  htsbuf_qprintf(&hdrs, "Upgrade: WebSocket\r\n");
+  htsbuf_qprintf(&hdrs, "Sec-WebSocket-Accept: %s\r\n", sig);
+  htsbuf_qprintf(&hdrs, "Sec-WebSocket-Origin: %s\r\n", origin);
+  htsbuf_qprintf(&hdrs, "Sec-WebSocket-Protocol: %s\r\n", wsh->wsh_protocol);
+  htsbuf_qprintf(&hdrs, "\r\n");
+
+  tcp_write_queue(hc->hc_fd, &hdrs);
+
+  if(wsh->wsh_init_cb)
+    rc = wsh->wsh_init_cb(hc, remain);
+
+  while(rc >= 0 && !tcp_read_queue(hc->hc_fd, &hdrs))
+    rc = websocket_input(hc, &hdrs, wsh->wsh_data_cb);
+
+  if(wsh->wsh_fini_cb)
+    wsh->wsh_fini_cb(hc);
+
+  return 0;
+}
+
+
+/**
+ *
+ */
+http_path_t *
+websocket_path_add(const char *path,
+		   websocket_handler_t *wsh,
+		   uint32_t accessmask)
+{
+  return http_path_add(path, wsh, http_websocket_loop, accessmask);
 }
 
 

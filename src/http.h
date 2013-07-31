@@ -29,6 +29,7 @@ typedef struct http_arg {
   char *val;
 } http_arg_t;
 
+#define HTTP_STATUS_SWICH_PROTO  101
 #define HTTP_STATUS_OK           200
 #define HTTP_STATUS_PARTIAL_CONTENT 206
 #define HTTP_STATUS_FOUND        302
@@ -90,6 +91,8 @@ typedef struct http_connection {
   char *hc_post_data;
   unsigned int hc_post_len;
 
+  void *hc_websocket_opaque;
+
 } http_connection_t;
 
 
@@ -136,5 +139,39 @@ void http_server_init(const char *bindaddr);
 int http_access_verify(http_connection_t *hc, int mask);
 
 void http_deescape(char *s);
+
+#define WS_OPCODE_CONTINUATION     0
+#define WS_OPCODE_TEXT             1
+#define WS_OPCODE_BINARY           2
+#define WS_OPCODE_CONNECTION_CLOSE 8
+#define WS_OPCODE_PING             9
+#define WS_OPCODE_PONG             10
+
+typedef int (websocket_callback_init_t)(http_connection_t *hc,
+					const char *remain);
+
+typedef int (websocket_callback_data_t)(http_connection_t *hc,
+					int opcode,
+					const uint8_t *data,
+					size_t len);
+
+typedef void (websocket_callback_fini_t)(http_connection_t *hc);
+
+typedef struct websocket_handler {
+  const char *wsh_protocol;
+  websocket_callback_init_t *wsh_init_cb;
+  websocket_callback_data_t *wsh_data_cb;
+  websocket_callback_fini_t *wsh_fini_cb;
+} websocket_handler_t;
+
+
+http_path_t * websocket_path_add(const char *path,
+				 websocket_handler_t *wsh,
+				 uint32_t accessmask);
+
+int websocket_send(int fd, int opcode, const void *data, size_t len);
+
+int websocket_sendq(int fd, int opcode, htsbuf_queue_t *hq);
+
 
 #endif /* HTTP_H_ */

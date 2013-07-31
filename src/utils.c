@@ -193,6 +193,37 @@ base64_decode(uint8_t *out, const char *in, int out_size)
     return dst - out;
 }
 
+int
+base64_encode(char *out, const uint8_t *in, int out_size, int in_size)
+{
+    static const char b64[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    char *ret, *dst;
+    unsigned i_bits = 0;
+    int i_shift = 0;
+    int bytes_remaining = in_size;
+
+    if (in_size >= UINT_MAX / 4 ||
+        out_size < (((in_size)+2) / 3 * 4 + 1))
+        return -1;
+    ret = dst = out;
+    while (bytes_remaining) {
+        i_bits = (i_bits << 8) + *in++;
+        bytes_remaining--;
+        i_shift += 8;
+
+        do {
+            *dst++ = b64[(i_bits << 6 >> i_shift) & 0x3f];
+            i_shift -= 6;
+        } while (i_shift > 6 || (bytes_remaining == 0 && i_shift > 0));
+    }
+    while ((dst - ret) & 3)
+        *dst++ = '=';
+    *dst = '\0';
+
+    return 0;
+}
+
 
 /**
  *
