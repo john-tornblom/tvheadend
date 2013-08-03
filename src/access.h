@@ -97,6 +97,12 @@ int access_verify(const char *username, const char *password,
 /**
  *
  */
+uint32_t access_get_rights(const char *username, const char *password,
+			   struct sockaddr *src);
+
+/**
+ *
+ */
 uint32_t access_get_hashed(const char *username, const uint8_t digest[20],
 			   const uint8_t *challenge, struct sockaddr *src,
 			   int *entrymatch);

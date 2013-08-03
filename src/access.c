@@ -222,12 +222,13 @@ netmask_verify(access_entry_t *ae, struct sockaddr *src)
   return 0;
 }
 
+
 /**
  *
  */
-int
-access_verify(const char *username, const char *password,
-	      struct sockaddr *src, uint32_t mask)
+uint32_t
+access_get_rights(const char *username, const char *password,
+		  struct sockaddr *src)
 {
   uint32_t bits = 0;
   access_entry_t *ae;
@@ -261,9 +262,22 @@ access_verify(const char *username, const char *password,
 
     bits |= ae->ae_rights;
   }
-  return (mask & bits) == mask ? 0 : -1;
+
+  return bits;
 }
 
+
+/**
+ *
+ */
+int
+access_verify(const char *username, const char *password,
+	      struct sockaddr *src, uint32_t mask)
+{
+  uint32_t bits = access_get_rights(username, password, src);
+
+  return (mask & bits) == mask ? 0 : -1;
+}
 
 
 /**
