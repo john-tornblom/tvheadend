@@ -40,8 +40,10 @@
 #include "access.h"
 #include "htsp_server.h"
 #include "streaming.h"
+#include "http.h"
 #include "psi.h"
 #include "htsmsg_binary.h"
+#include "htsmsg_json.h"
 #include "epg.h"
 #include "plumbing/tsfix.h"
 #include "imagecache.h"
@@ -2161,6 +2163,151 @@ htsp_serve(int fd, void *opaque, struct sockaddr_storage *source,
 
 
 /**
+ *
+ */
+static void *
+htsp_websocket_write_scheduler(void *aux)
+{
+  htsp_connection_t *htsp = aux;
+  htsp_msg_q_t *hmq;
+  htsp_msg_t *hm;
+  htsbuf_queue_t hq;
+
+  htsbuf_queue_init(&hq, 0);
+  pthread_mutex_lock(&htsp->htsp_out_mutex);
+
+  while(1) {
+
+    if((hmq = TAILQ_FIRST(&htsp->htsp_active_output_queues)) == NULL) {
+      /* No active queues at all */
+      if(!htsp->htsp_writer_run)
+	break; /* Should not run anymore, bail out */
+
+      /* Nothing to be done, go to sleep */
+      pthread_cond_wait(&htsp->htsp_out_cond, &htsp->htsp_out_mutex);
+      continue;
+    }
+
+    hm = TAILQ_FIRST(&hmq->hmq_q);
+    TAILQ_REMOVE(&hmq->hmq_q, hm, hm_link);
+    hmq->hmq_length--;
+    hmq->hmq_payload -= hm->hm_payloadsize;
+
+    TAILQ_REMOVE(&htsp->htsp_active_output_queues, hmq, hmq_link);
+    if(hmq->hmq_length) {
+      /* Still messages to be sent, put back in active queues */
+      if(hmq->hmq_strict_prio) {
+	      TAILQ_INSERT_HEAD(&htsp->htsp_active_output_queues, hmq, hmq_link);
+      } else {
+        TAILQ_INSERT_TAIL(&htsp->htsp_active_output_queues, hmq, hmq_link);
+      }
+    }
+
+    pthread_mutex_unlock(&htsp->htsp_out_mutex);
+    htsmsg_json_serialize(hm->hm_msg, &hq, 0);
+    htsp_msg_destroy(hm);
+
+    if (websocket_sendq(htsp->htsp_fd, WS_OPCODE_TEXT, &hq)) {
+      tvhlog(LOG_INFO, "htsp", "%s: Write error -- %s",
+             htsp->htsp_logname, strerror(errno));
+      break;
+    }
+
+    htsbuf_queue_flush(&hq);
+    pthread_mutex_lock(&htsp->htsp_out_mutex);
+  }
+
+  pthread_mutex_unlock(&htsp->htsp_out_mutex);
+  return NULL;
+}
+
+
+
+static int
+htsp_websocket_init(http_connection_t *hc, const char *remain)
+{
+  htsp_connection_t *htsp;
+  uint32_t access;
+
+  htsp = (htsp_connection_t *)calloc(1, sizeof(htsp_connection_t));
+
+  htsp_connection_init(htsp, hc->hc_fd, hc->hc_peer,
+		       htsp_websocket_write_scheduler);
+
+  access = access_get_rights(hc->hc_username, hc->hc_password,
+			     (struct sockaddr *)hc->hc_peer);
+ 
+  if(hc->hc_username)
+    tvh_str_update(&htsp->htsp_username, hc->hc_username);
+
+  htsp->htsp_granted_access |= access;
+
+  hc->hc_websocket_opaque = htsp;
+  return 0;
+}
+
+
+static int
+htsp_websocket_data(http_connection_t *hc, int opcode,
+		    const uint8_t *data, size_t length)
+{
+  htsp_connection_t *htsp;
+  htsmsg_t *m;
+  size_t size;
+  void *buf;
+
+  htsp = (htsp_connection_t *)hc->hc_websocket_opaque;
+
+  if(opcode == WS_OPCODE_TEXT) {
+    m = htsmsg_json_deserialize((const char*)data);
+  } else if(opcode == WS_OPCODE_BINARY) {
+    size = (data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3];
+
+    if(size > 1024 * 1024)
+      return -1;
+
+    if(size != length - 4)
+      return -1;
+
+    if((buf = malloc(size)) == NULL)
+      return -1;
+
+    /* buf will be tied to the message.
+     * NB: If the message can not be deserialized buf will be free'd by the
+     * function.
+     */
+    memcpy(buf, data, length);
+    m = htsmsg_binary_deserialize(buf, size, buf);
+  } else {
+    return -1;
+  }
+
+  htsp_handle_message(htsp, m);
+  htsmsg_destroy(m);
+
+  return 0;
+}
+
+
+static void
+htsp_websocket_fini(http_connection_t *hc)
+{
+  htsp_connection_t *htsp = (htsp_connection_t *)hc->hc_websocket_opaque;
+
+  tvhlog(LOG_INFO, "htsp", "%s: Disconnected", htsp->htsp_logname);
+  htsp_connection_fini(htsp);
+}
+
+
+websocket_handler_t htsp_websocket_handler = {
+  .wsh_protocol = "htsp",
+  .wsh_init_cb  = htsp_websocket_init,
+  .wsh_data_cb  = htsp_websocket_data,
+  .wsh_fini_cb  = htsp_websocket_fini
+};
+
+
+/**
  *  Fire up HTSP server
  */
 void
@@ -2170,6 +2317,8 @@ htsp_init(const char *bindaddr)
   htsp_server = tcp_server_create(bindaddr, tvheadend_htsp_port, htsp_serve, NULL);
   if(tvheadend_htsp_port_extra)
     htsp_server_2 = tcp_server_create(bindaddr, tvheadend_htsp_port_extra, htsp_serve, NULL);
+
+  websocket_path_add("/htsp", &htsp_websocket_handler, ACCESS_WEB_INTERFACE);
 }
 
 /* **************************************************************************
