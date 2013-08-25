@@ -211,7 +211,7 @@ tv.ui.VideoPlayer = Ext.extend(Ext.Panel, (function() {
 
 	error: function(e) {
 	    var url = this.source.dom.src;
-	    if(url && url != document.location.href) {
+	    if(url && url.indexOf("channelid") != -1) {
 		this.body.removeClass('tv-video-loading');
 		this.body.removeClass('tv-video-idle');
 		this.body.addClass('tv-video-error');
