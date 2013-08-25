@@ -349,6 +349,13 @@ tv.ui.ChannelList = Ext.extend(Ext.DataView, {
         tv.ui.ChannelList.superclass.onRender.call(this, ct, position);
 	Ext.dd.ScrollManager.register(this.el);
 
+	this.el.on('mousewheel', function(e) {
+	    if(e.browserEvent.wheelDelta < 0)
+		this.fireEvent('navdown', 1);
+	    else if(e.browserEvent.wheelDelta > 0)
+		this.fireEvent('navup', 1);
+	}.bind(this));
+
 	this.getTemplateTarget().set({tabindex: Ext.id(undefined, '0')});
 	this.getTemplateTarget().on('keydown', function(e) {
 	    switch(e.getKey()) {
@@ -501,6 +508,18 @@ tv.app = function() {
 		    chList.focus();   
 		}
 	    });
+
+	    Ext.getDoc().on('click', function(e) {
+		chListPanel.show();
+		chList.focus();
+	    });
+
+	    Ext.getDoc().on('contextmenu', function(e) {
+		chListPanel.hide();
+		e.stopEvent();
+	    });
+
+
 	    
 	    chListPanel.show();
 	    chList.focus();
