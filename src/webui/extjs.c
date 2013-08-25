@@ -213,6 +213,7 @@ extjs_livetv(http_connection_t *hc, const char *remain, void *opaque)
     extjs_load(hq, "static/extjs/ext-all.js");
   }
 
+  extjs_load(hq, "static/htsp.js");
   extjs_load(hq, "static/tv.js");
   extjs_exec(hq, "Ext.onReady(tv.app.init, tv.app);");
 

@@ -300,8 +300,8 @@ tv.ui.ChannelList = Ext.extend(Ext.DataView, {
 	    singleSelect: true,
 	    tpl: new Ext.XTemplate(
 		'<tpl for=".">',
-		'<div class="tv-list-item" id="chid_{chid}">',
-		'<img src="{ch_icon}" title="{name}">{name}',
+		'<div class="tv-list-item" id="chid_{id}">',
+		'<img src="{icon}" title="{name}">{name}',
 		'</div>',
 		'</tpl>'),
 
@@ -410,6 +410,8 @@ tv.ui.ChannelList = Ext.extend(Ext.DataView, {
 
 
 tv.app = function() {
+    var client = new htsp.Client();
+
     return {
 	init: function() {
 
@@ -421,20 +423,7 @@ tv.app = function() {
 	    });
 
 	    var chList = new tv.ui.ChannelList({
-		store: new Ext.data.JsonStore({
-		    autoLoad : true,
-		    root : 'entries',
-		    fields : ['ch_icon', 'number', 'name', 'chid'],
-		    id : 'chid',
-		    sortInfo : {
-			field : 'number',
-			direction : "ASC"
-		    },
-		    url : "channels",
-		    baseParams : {
-			op : 'list'
-		    }
-		})
+		store: client.channelStore
 	    });
 
 	    var chListPanel = new Ext.Panel({
@@ -466,9 +455,9 @@ tv.app = function() {
 		if(indices.length == 0)
 		    return;
 		    
-		var item = this.store.getAt(indices[0]);
+		var ch = this.store.getAt(indices[0]);
 
-		videoPlayer.zapTo(item.data.chid);
+		videoPlayer.zapTo(ch.data.id);
 		chListPanel.hide();
 		chList.blur();
 	    });
@@ -523,6 +512,8 @@ tv.app = function() {
 	    
 	    chListPanel.show();
 	    chList.focus();
+
+	    client.connect();
 	}
     };
 }(); // end of app
