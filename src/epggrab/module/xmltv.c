@@ -687,7 +687,7 @@ static void _xmltv_load_grabbers ( void )
   char *tmp, *tmp2 = NULL, *path;
 
   /* Load data */
-  outlen = spawn_and_store_stdout(XMLTV_FIND, NULL, &outbuf);
+  outlen = spawn_and_store_stdout(XMLTV_FIND, NULL, NULL, &outbuf);
 
   /* Process */
   if ( outlen > 0 ) {
@@ -731,7 +731,7 @@ static void _xmltv_load_grabbers ( void )
           if (stat(bin, &st)) continue;
           if (!(st.st_mode & S_IEXEC)) continue;
           if (!S_ISREG(st.st_mode)) continue;
-          if ((outlen = spawn_and_store_stdout(bin, argv, &outbuf)) > 0) {
+          if ((outlen = spawn_and_store_stdout(bin, argv, NULL, &outbuf)) > 0) {
             if (outbuf[outlen-1] == '\n') outbuf[outlen-1] = '\0';
             snprintf(name, sizeof(name), "XMLTV: %s", outbuf);
             epggrab_module_int_create(NULL, bin, name, 3, bin,

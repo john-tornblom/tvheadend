@@ -153,12 +153,18 @@ spawn_enq(const char *name, int pid)
  */
 
 int
-spawn_and_store_stdout(const char *prog, char *argv[], char **outp)
+spawn_and_store_stdout(const char *prog, char *argv[], char *in, char **outp)
 {
   pid_t p;
-  int fd[2], f;
+  int fd[2][2], f;
   char bin[256];
   const char *local_argv[2] = { NULL, NULL };
+
+#define PARENT_READ fd[0][0]
+#define CHILD_WRITE fd[0][1]
+
+#define CHILD_READ fd[1][0]
+#define PARENT_WRITE fd[1][1]
 
   if (*prog != '/' && *prog != '.') {
     if (!find_exec(prog, bin, sizeof(bin))) return -1;
@@ -170,7 +176,7 @@ spawn_and_store_stdout(const char *prog, char *argv[], char **outp)
 
   pthread_mutex_lock(&fork_lock);
 
-  if(pipe(fd) == -1) {
+  if(pipe(fd[0]) == -1 || pipe(fd[1]) == -1) {
     pthread_mutex_unlock(&fork_lock);
     return -1;
   }
@@ -184,12 +190,16 @@ spawn_and_store_stdout(const char *prog, char *argv[], char **outp)
     return -1;
   }
 
-  if(p == 0) {
-    close(0);
-    close(2);
-    close(fd[0]);
-    dup2(fd[1], 1);
-    close(fd[1]);
+  if(p == 0) { /* in the child */
+    close(STDERR_FILENO);
+    close(PARENT_READ);
+    close(PARENT_WRITE);
+
+    dup2(CHILD_READ, STDIN_FILENO);
+    close(CHILD_READ);
+
+    dup2(CHILD_WRITE, STDOUT_FILENO);
+    close(CHILD_WRITE);
 
     f = open("/dev/null", O_RDWR);
     if(f == -1) {
@@ -199,8 +209,7 @@ spawn_and_store_stdout(const char *prog, char *argv[], char **outp)
       exit(1);
     }
 
-    dup2(f, 0);
-    dup2(f, 2);
+    dup2(f, STDERR_FILENO);
     close(f);
 
     execve(prog, argv, environ);
@@ -213,9 +222,16 @@ spawn_and_store_stdout(const char *prog, char *argv[], char **outp)
 
   spawn_enq(prog, p);
 
-  close(fd[1]);
+  close(CHILD_READ);
+  close(CHILD_WRITE);
 
-  return file_readall(fd[0], outp);
+  if(in && write(PARENT_WRITE, in, strlen(in)) < 0)
+    syslog(LOG_ERR,
+	   "spawn: pid %d cannot write %s -- %s",
+	   getpid(), prog, strerror(errno));
+
+  close(PARENT_WRITE);
+  return file_readall(PARENT_READ, outp);
 }
 
 

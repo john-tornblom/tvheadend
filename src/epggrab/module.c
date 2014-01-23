@@ -278,7 +278,7 @@ char *epggrab_module_grab_spawn ( void *m )
   tvhlog(LOG_INFO, mod->id, "grab %s", mod->path);
 
   /* Grab */
-  outlen = spawn_and_store_stdout(mod->path, NULL, &outbuf);
+  outlen = spawn_and_store_stdout(mod->path, NULL, NULL, &outbuf);
   if ( outlen < 1 ) {
     tvhlog(LOG_ERR, mod->id, "no output detected");
     return NULL;
