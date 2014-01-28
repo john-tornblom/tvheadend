@@ -432,6 +432,9 @@ struct epg_broadcast
   uint8_t                    is_new;           ///< New series / file premiere
   uint8_t                    is_repeat;        ///< Repeat screening
 
+  uint32_t                   _scraping;        ///< Currently being scraped
+  time_t                     scraped;          ///< Last time scraped
+
   /* Broadcast level text */
   lang_str_t                *summary;          ///< Summary
   lang_str_t                *description;      ///< Description

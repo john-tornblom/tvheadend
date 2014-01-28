@@ -82,6 +82,7 @@ SRCS =  src/version.c \
 	src/epg.c \
 	src/epgdb.c\
 	src/epggrab.c\
+	src/epgscrape.c\
 	src/spawn.c \
 	src/packet.c \
 	src/streaming.c \
@@ -124,6 +125,7 @@ SRCS += \
 	src/api/api_mpegts.c \
 	src/api/api_epg.c \
 	src/api/api_epggrab.c \
+	src/api/api_epgscrape.c \
 	src/api/api_imagecache.c
 
 SRCS += \

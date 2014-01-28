@@ -57,6 +57,7 @@
 #include "config2.h"
 #include "idnode.h"
 #include "imagecache.h"
+#include "epgscrape.h"
 #include "timeshift.h"
 #include "fsmonitor.h"
 #if ENABLE_LIBAV
@@ -742,6 +743,8 @@ main(int argc, char **argv)
   config_init();
 
   imagecache_init();
+
+  epgscrape_init();
 
   service_init();
 

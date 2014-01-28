@@ -32,6 +32,7 @@
 #include "dvr/dvr.h"
 #include "htsp_server.h"
 #include "epggrab.h"
+#include "epgscrape.h"
 #include "imagecache.h"
 
 /* Broadcast hashing */
@@ -94,6 +95,7 @@ static int _episode_order ( const void *_a, const void *_b )
   return a->epnum.p_num - b->epnum.p_num;
 }
 
+
 void epg_updated ( void )
 {
   epg_object_t *eo;
@@ -111,6 +113,10 @@ void epg_updated ( void )
 
   /* Update updated */
   while ((eo = LIST_FIRST(&epg_object_updated))) {
+    // scrape for more detailed information
+    if(eo->type == EPG_BROADCAST)
+      epgscrape_enqueue_broadcast((epg_broadcast_t *)eo);
+
     eo->update(eo);
     LIST_REMOVE(eo, up_link);
     eo->_updated = 0;
@@ -1771,6 +1777,7 @@ htsmsg_t *epg_broadcast_serialize ( epg_broadcast_t *broadcast )
   if (!(m = _epg_object_serialize((epg_object_t*)broadcast))) return NULL;
   htsmsg_add_s64(m, "start", broadcast->start);
   htsmsg_add_s64(m, "stop", broadcast->stop);
+  htsmsg_add_s64(m, "scraped", broadcast->scraped);
   htsmsg_add_str(m, "episode", broadcast->episode->uri);
   if (broadcast->channel)
     htsmsg_add_str(m, "channel", channel_get_uuid(broadcast->channel));
@@ -1842,6 +1849,8 @@ epg_broadcast_t *epg_broadcast_deserialize
   /* Create */
   ebc = _epg_channel_add_broadcast(ch, skel, create, save);
   if (!ebc) return NULL;
+
+  ebc->scraped = htsmsg_get_s64_or_default(m, "scraped", 0);
 
   /* Get metadata */
   if (!htsmsg_get_u32(m, "is_widescreen", &u32))
