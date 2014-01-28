@@ -43,6 +43,13 @@ tvheadend.miscconf = function() {
        'tvhtime_tolerance', 'transcoding_enabled']);
 
   /*
+   * EPG Scrape
+   */
+  var epgscrape_reader = new Ext.data.JsonReader({
+    root: 'entries'
+  }, ['enabled', 'exec']);
+
+  /*
    * Imagecache
    */
   var imagecache_reader = new Ext.data.JsonReader({
@@ -110,6 +117,41 @@ tvheadend.miscconf = function() {
     autoHeight: true,
     collapsible: true,
     items : [ tvhtimeUpdateEnabled, tvhtimeNtpEnabled, tvhtimeTolerance ]
+  });
+
+
+  /*
+   * EPG Scrape
+   */
+  var epgscrapeEnabled = new Ext.ux.form.XCheckbox({
+    name: 'enabled',
+    fieldLabel: 'Enabled',
+  });
+
+  var epgscrapeExec = new Ext.form.TextField({
+    name: 'exec',
+    fieldLabel: 'Path to external executable',
+    width: '100%'
+  });
+
+  var epgscrapePanel = new Ext.form.FieldSet({
+    title: 'External EPG Scraping',
+    width: 700,
+    autoHeight: true,
+    collapsible: true,
+    items : [epgscrapeEnabled, epgscrapeExec]
+  });
+
+  var epgscrape_form = new Ext.form.FormPanel({
+    border : false,
+    labelAlign : 'left',
+    labelWidth : 200,
+    waitMsgTarget : true,
+    reader: epgscrape_reader,
+    layout : 'form',
+    defaultType : 'textfield',
+    autoHeight : true,
+    items : [ epgscrapePanel ]
   });
 
   /*
@@ -215,7 +257,8 @@ tvheadend.miscconf = function() {
 		border : false,
 		bodyStyle : 'padding:15px',
 		layout : 'form',
-    items: [confpanel, imagecache_form ],
+		autoScroll : true,
+		items: [confpanel, imagecache_form, epgscrape_form  ],
 		tbar : [ saveButton, '->', helpButton ]
   });
 
@@ -233,6 +276,17 @@ tvheadend.miscconf = function() {
 				confpanel.enable();
 			}
 		});
+
+		epgscrape_form.getForm().load({
+			url     : 'api/epgscrape/config/load',
+			success : function (form, action) {
+				epgscrape_form.enable();
+			},
+			failure : function (form, action) {
+				alert("FAILED");
+			}
+		});
+
     imagecache_form.getForm().load({
       url     : 'api/imagecache/config/load',
       success : function (form, action) {
@@ -255,6 +309,15 @@ tvheadend.miscconf = function() {
 				Ext.Msg.alert('Save failed', action.result.errormsg);
 			}
 		});
+
+		epgscrape_form.getForm().submit({
+			url     : 'api/epgscrape/config/save',
+			waitMsg : 'Saving data...',
+			failure : function(form, action) {
+				Ext.Msg.alert('Save failed', action.result.errormsg);
+			}
+		});
+
     imagecache_form.getForm().submit({
       url     : 'api/imagecache/config/save',
       waitMsg : 'Saving data...',
