@@ -68,11 +68,12 @@ def handle_message(msg):
     if episode_count:
         res['episode']['episode_count'] = episode_count
 
-    msg = json.dumps(res)
-    print(msg)
+    return json.dumps(res)
 
 
 if __name__ == "__main__":
-    handle_message(sys.stdin.read())
-    #handle_message(sample_input)
+    res = handle_message(sys.stdin.read())
+    #res = handle_message(sample_input)
+
+    if res: print(res)
 

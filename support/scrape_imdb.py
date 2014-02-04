@@ -112,11 +112,14 @@ def handle_message(msg):
     if content_group != 1:
         return
 
-    res = search_movie(obj['title'], year)
-    msg = json.dumps(res)
-    print(msg)
+    res = dict()
+    res['episode'] = search_movie(obj['title'], year)
+    return json.dumps(res)
 
 
 if __name__ == "__main__":
-    handle_message(sys.stdin.read())
-    #handle_message(sample_input)
+    res = handle_message(sys.stdin.read())
+    #res = handle_message(sample_input)
+
+    if res: print(res)
+    
