@@ -112,6 +112,10 @@ def handle_message(msg):
     if content_group != 1:
         return
 
+    # Adult movie, usually not listed
+    if content_type == 24:
+        return
+
     res = dict()
     res['episode'] = search_movie(obj['title'], year)
     return json.dumps(res)
