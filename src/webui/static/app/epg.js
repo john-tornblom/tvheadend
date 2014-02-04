@@ -40,11 +40,19 @@ tvheadend.epgDetails = function(event) {
 	if (event.subtitle) 
 		content += "&nbsp;:&nbsp;" + event.subtitle;
 	content += '</div>';
+
 	content += '<div class="x-epg-desc">' + event.episode + '</div>';
 	content += '<div class="x-epg-desc">' + event.description + '</div>';
-	content += '<div class="x-epg-meta">' + event.starrating + '</div>';
-	content += '<div class="x-epg-meta">' + event.agerating + '</div>';
-	content += '<div class="x-epg-meta">' + tvheadend.contentGroupLookupName(event.contenttype) + '</div>';
+
+	if (event.starrating)
+		content += '<div class="x-epg-meta"><b>Star rating: </b>' + event.starrating + '%</div>';
+
+	if (event.agerating)
+		content += '<div class="x-epg-meta"><b>Age rating: </b>' + event.agerating + '</div>';
+
+	if (event.contenttype)
+		content += '<div class="x-epg-meta"><b>Content type: </b>' + 
+			tvheadend.contentGroupLookupName(event.contenttype) + '</div>';
 
 	if (event.ext_desc != null) 
 		content += '<div class="x-epg-meta">' + event.ext_desc + '</div>';
@@ -55,7 +63,7 @@ tvheadend.epgDetails = function(event) {
 	if (event.ext_text != null) 
 		content += '<div class="x-epg-meta">' + event.ext_text + '</div>';
 
-	content += '<div class="x-epg-meta"><a target="_blank" href="http://akas.imdb.org/find?q=' + event.title + '">Search IMDB</a></div>'
+	content += '<div class="x-epg-meta"><a target="_blank" href="http://akas.imdb.org/find?q=' + event.title + '">Search IMDb</a></div>'
 	content += '<div id="related"></div>';
 	content += '<div id="altbcast"></div>';
 
@@ -76,6 +84,7 @@ tvheadend.epgDetails = function(event) {
 		layout : 'fit',
 		width : 500,
 		height : 300,
+		autoScroll : true,
 		constrainHeader : true,
 		buttons : [ confcombo, new Ext.Button({
 			handler : recordEvent,
