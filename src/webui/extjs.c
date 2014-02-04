@@ -747,6 +747,9 @@ extjs_epg(http_connection_t *hc, const char *remain, void *opaque)
     if(ch->ch_icon != NULL)
       htsmsg_add_imageurl(m, "chicon", "imagecache/%d", ch->ch_icon);
 
+    if(ee->image != NULL)
+      htsmsg_add_imageurl(m, "image", "imagecache/%d", ee->image);
+
     if((s = epg_episode_get_title(ee, lang)))
       htsmsg_add_str(m, "title", s);
     if((s = epg_episode_get_subtitle(ee, lang)))
@@ -757,7 +760,7 @@ extjs_epg(http_connection_t *hc, const char *remain, void *opaque)
     else if((s = epg_broadcast_get_summary(e, lang)))
       htsmsg_add_str(m, "description", s);
 
-    if (epg_episode_number_format(ee, buf, 100, NULL, "Season %d", ".",
+    if (epg_episode_number_format(ee, buf, 100, NULL, "Season %d", ", ",
                                   "Episode %d", "/%d"))
       htsmsg_add_str(m, "episode", buf);
 

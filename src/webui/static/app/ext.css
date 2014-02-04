@@ -300,6 +300,13 @@
 	max-height: 99px;
 }
 
+.x-epg-image {
+	float: right;
+	margin: 5px;
+	max-width: 132px;
+	max-height: 200px;
+}
+
 .x-epg-meta {
 	margin: 5px;
 }

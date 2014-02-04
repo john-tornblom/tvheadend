@@ -31,7 +31,9 @@ tvheadend.epgDetails = function(event) {
 
 	var content = '';
 	
-	if (event.chicon != null && event.chicon.length > 0) 
+	if (event.image != null && event.image.length > 0)
+		content += '<img class="x-epg-image" src="'+ event.image + '">';
+	else if (event.chicon != null && event.chicon.length > 0)
 		content += '<img class="x-epg-chicon" src="'+ event.chicon + '">';
 	
 	content += '<div class="x-epg-title">' + event.title;
@@ -214,6 +216,8 @@ tvheadend.epg = function() {
 			name : 'description'
 		}, {
 			name : 'chicon'
+		}, {
+			name : 'image'
 		}, {
 			name : 'start',
 			type : 'date',
