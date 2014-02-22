@@ -30,18 +30,16 @@ import scrape_comhem
 
 if __name__ == "__main__":
     msg = sys.stdin.read()
-    obj = json.loads(msg)
-    res = None
+    res = scrape_comhem.handle_message(msg)
 
-    content_group = content_type = None
-    if 'content_type' in obj:
-        content_type  = obj['content_type']
-        content_group = (content_type >> 4) & 0xf
+    if not res:
+        obj = json.loads(msg)
+        if 'content_type' in obj:
+            content_type  = obj['content_type']
+            content_group = (content_type >> 4) & 0xf
+
+            if content_group == 1:
+                res = scrape_imdb.handle_message(msg)
     
-    if content_group == 1: # A movie
-        res = scrape_imdb.handle_message(msg)
-    else:
-        res = scrape_comhem.handle_message(msg)
-
     if res: print(res)
 
