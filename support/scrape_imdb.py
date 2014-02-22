@@ -58,13 +58,13 @@ def get_movie_info(imdb_id):
         if not v: continue
 
         if k == 'title':
-            res['title'] = v.decode('utf-8')
+            res['title'] = v
 
         elif k == 'plot outline':
-            res['summary'] = v.decode('utf-8')
+            res['summary'] = v
 
         elif k == 'plot':
-            res['description'] = v[0].decode('utf-8')
+            res['description'] = v[0]
 
         elif k == 'full-size cover url':
             res['image'] = v
