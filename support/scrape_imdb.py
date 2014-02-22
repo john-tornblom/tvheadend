@@ -83,7 +83,8 @@ def search_movie(title, year=None):
 
     results = i.search_movie(title)
     for res in results:
-        if year and year != res['year']: continue
+        r = range(res['year'] - 1, res['year'] + 2)
+        if year and not (year in r): continue
 
         return get_movie_info(res.movieID)
 
