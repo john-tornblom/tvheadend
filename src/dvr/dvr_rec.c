@@ -129,16 +129,16 @@ cleanupfilename(char *s, int dvr_flags)
   for(i = 0; i < len; i++) { 
 
     if(s[i] == '/')
-      s[i] = '-';
+      s[i] = '_';
 
     else if((dvr_flags & DVR_WHITESPACE_IN_TITLE) &&
             (s[i] == ' ' || s[i] == '\t'))
-      s[i] = '-';	
+      s[i] = '_';	
 
     else if((dvr_flags & DVR_CLEAN_TITLE) &&
             ((s[i] < 32) || (s[i] > 122) ||
              (strchr("/:\\<>|*?'\"", s[i]) != NULL)))
-      s[i] = '-';
+      s[i] = '_';
   }
 }
 
